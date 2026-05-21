@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Study Python for Finance</title>
+<link rel="stylesheet" href="styles.css" />
+<!-- KaTeX for math rendering (bundled locally) -->
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+<script defer src="vendor/katex/auto-render.min.js"></script>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+</head>
+<body class="theme-dark">
+  <!-- ========================================================== -->
+  <!-- App Shell                                                  -->
+  <!-- ========================================================== -->
+  <div id="app" class="app-shell">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" data-collapsed="false">
+      <a class="brand" href="#" id="brand-home">
+        <div class="brand__wordmark">
+          <span class="brand__word-main">Study&nbsp;Python</span>
+          <span class="brand__word-sub">for&nbsp;Finance</span>
+        </div>
+        <span class="brand__ver">v0.5</span>
+      </a>
+
+      <nav class="nav">
+        <div class="nav__group">Learn</div>
+        <button class="nav__item is-active" data-view="dashboard">
+          <span class="nav__glyph">◇</span> ダッシュボード
+          <span class="nav__kbd"><kbd>Ctrl</kbd><kbd>1</kbd></span>
+        </button>
+        <button class="nav__item" data-view="chapters">
+          <span class="nav__glyph">▤</span> 章を学ぶ
+          <span class="nav__kbd"><kbd>Ctrl</kbd><kbd>2</kbd></span>
+        </button>
+        <button class="nav__item" data-view="practice">
+          <span class="nav__glyph">◈</span> 練習問題
+        </button>
+        <button class="nav__item" data-view="tests">
+          <span class="nav__glyph">✓</span> 実力テスト
+          <span class="nav__kbd"><kbd>Ctrl</kbd><kbd>4</kbd></span>
+        </button>
+        <button class="nav__item" data-view="history">
+          <span class="nav__glyph">≡</span> 学習履歴
+          <span class="nav__kbd"><kbd>Ctrl</kbd><kbd>5</kbd></span>
+        </button>
+
+        <div class="nav__group">Tools</div>
+        <button class="nav__item" data-view="references">
+          <span class="nav__glyph">✎</span> リファレンス
+        </button>
+        <button class="nav__item" data-view="settings">
+          <span class="nav__glyph">⚙</span> 設定
+        </button>
+      </nav>
+
+    </aside>
+
+    <!-- Main column -->
+    <main class="main">
+      <header class="topbar">
+        <div class="crumbs" id="crumbs">
+          <span class="crumbs__current">ダッシュボード</span>
+        </div>
+        <div class="topbar__right">
+          <button class="search-btn" id="open-palette-top">
+            <span>⌕</span>
+            <span>検索 / コマンド</span>
+            <kbd>Ctrl</kbd><kbd>K</kbd>
+          </button>
+          <div class="kernel-pill" id="kernel-pill" data-state="ready">
+            <span class="dot"></span>
+            <span class="kernel-pill__label">ready</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ============================================== -->
+      <!-- View: Dashboard                                -->
+      <!-- ============================================== -->
+      <section class="view view--dashboard is-active" data-view="dashboard">
+        <div class="view__inner">
+          <div class="hero">
+            <h1 class="hero__title">前回のつづきから、<br/>演習を再開しましょう。</h1>
+            <p class="hero__sub" id="hero-sub">章を選んで学習を始めましょう。</p>
+          </div>
+
+          <article class="continue" id="continue-card">
+            <div class="continue__left">
+              <div class="tag-row">
+                <span class="tag tag--accent">PINNED</span>
+                <span class="tag" id="cont-phase">Phase A</span>
+                <span class="tag" id="cont-ch">Ch 07</span>
+                <span class="tag tag--ghost" id="cont-age">2 時間前に更新</span>
+              </div>
+              <h2 class="continue__title" id="cont-title">ループ (for / while)</h2>
+              <p class="continue__desc" id="cont-desc">for / while で繰り返し処理を書ける</p>
+
+              <div class="continue__actions">
+                <button class="btn btn--primary" id="resume-btn">
+                  再開する
+                  <kbd class="kbd-on-btn">↵</kbd>
+                </button>
+                <button class="btn btn--ghost" id="browse-btn">章一覧を開く
+                  <kbd class="kbd-on-btn">Ctrl B</kbd>
+                </button>
+                <span class="continue__meta" id="cont-page">ページ 1 / 3</span>
+              </div>
+            </div>
+            <div class="continue__right">
+              <pre class="codecard"><span class="ln">1</span><span class="kw">for</span> fruit <span class="kw">in</span> [<span class="str">"apple"</span>, <span class="str">"banana"</span>, <span class="str">"cherry"</span>]:
+<span class="ln">2</span>    <span class="bi">print</span>(fruit)
+<span class="ln">3</span></pre>
+            </div>
+          </article>
+
+          <div class="grid">
+            <section class="card card--info">
+              <header class="card__head">
+                <h3>フェーズ別の進捗</h3>
+                <span class="card__badge card__badge--info">閲覧専用</span>
+                <span class="card__hint">26 章 / 6 フェーズ</span>
+              </header>
+              <div class="phases" id="phases"></div>
+            </section>
+
+            <section class="card card--info card--stat">
+              <header class="card__head">
+                <h3>今週の様子</h3>
+                <span class="card__badge card__badge--info">閲覧専用</span>
+                <span class="card__hint">直近 7 日</span>
+              </header>
+              <div class="stats">
+                <div class="stat"><div class="stat__v" id="s-total">26</div><div class="stat__l">総章数</div></div>
+                <div class="stat"><div class="stat__v" id="s-done">0</div><div class="stat__l">完了</div></div>
+                <div class="stat"><div class="stat__v" id="s-inprog">0</div><div class="stat__l">進行中</div>
+                  <span class="stat__hint" id="s-inprog-hint"></span>
+                </div>
+                <div class="stat stat--accent"><div class="stat__v" id="s-avg">—</div><div class="stat__l">テスト平均</div>
+                  <span class="stat__hint" id="s-avg-hint">テストを受けるとここに平均点が表示されます。</span>
+                </div>
+              </div>
+              <div class="spark__legend">
+                <span class="spark__legend-title" id="spark-title">日別の学習スコア</span>
+                <span class="spark__legend-note" id="spark-note">最近 7 日 · 0〜100%</span>
+              </div>
+              <div class="spark" aria-hidden="true" id="spark"></div>
+              <div class="spark__axis" id="spark-axis"></div>
+            </section>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- View: Chapters                                 -->
+      <!-- ============================================== -->
+      <section class="view view--chapters" data-view="chapters">
+        <div class="view__inner">
+          <header class="page-head">
+            <span class="kicker"><span class="dot"></span> Chapters</span>
+            <h1>章を選ぶ</h1>
+            <p class="page-head__sub">Phase A〜F の 26 章。完了 / 進行中 / 未着手をすべて一覧で。</p>
+          </header>
+          <div class="chap-grid" id="chap-grid"></div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- View: Chapter detail (Sample / Exercise / Result) -->
+      <!-- ============================================== -->
+      <section class="view view--chapter" data-view="chapter">
+        <div class="chapter">
+          <header class="chapter__head">
+            <span class="chap-dot"></span>
+            <span class="chap-phase" id="chap-phase">Phase A</span>
+            <span class="sep">›</span>
+            <span class="chap-num" id="chap-num">Ch 07</span>
+            <span class="sep">›</span>
+            <span class="chap-title" id="chap-title">ループ (for / while)</span>
+            <div class="dots" id="chap-dots"></div>
+            <span class="chap-count" id="chap-count">01 / 03</span>
+            <button class="btn btn--ghost btn--small" id="chap-close">閉じる</button>
+          </header>
+          <div class="chapter__progress"><div class="chapter__progress-fill" id="chap-prog"></div></div>
+          <div class="chapter__body" id="chap-body"></div>
+
+          <!-- Mascot strip (image speaks for itself; no "MENTOR" label) -->
+          <div class="mascot">
+            <div class="mascot__avatar">
+              <img id="mascot-img" src="../resources/stickman/explain.png" alt="mentor" />
+            </div>
+            <div class="mascot__speech" id="mascot-speech">コードを読んで、何が起きるか考えてみよう。</div>
+            <span class="mascot__pulse"></span>
+          </div>
+
+          <footer class="chapter__foot">
+            <div class="chapter__foot-right">
+              <button class="btn btn--primary" id="next-btn">次へ</button>
+            </div>
+          </footer>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- View: Tests (picker)                           -->
+      <!-- ============================================== -->
+      <section class="view view--tests" data-view="tests">
+        <div class="view__inner">
+          <header class="page-head">
+            <span class="kicker"><span class="dot"></span> Tests</span>
+            <h1>実力テスト</h1>
+            <p class="page-head__sub">Phase ごとに 10 問。制限時間 30 分、合格基準 60%。</p>
+          </header>
+          <div class="test-grid" id="test-grid"></div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- View: Test runner (active session)             -->
+      <!-- ============================================== -->
+      <section class="view view--test-runner" data-view="test-runner">
+        <div class="test-runner">
+          <header class="test-runner__head">
+            <div class="test-runner__title">
+              <span class="tag tag--accent" id="tr-phase">Phase A</span>
+              <span class="test-runner__name" id="tr-title">Phase A 実力テスト</span>
+            </div>
+            <div class="test-runner__meta">
+              <div class="tr-timer" id="tr-timer">
+                <span class="tr-timer__label">残り時間</span>
+                <span class="tr-timer__value">30:00</span>
+              </div>
+              <div class="tr-counter" id="tr-counter">Q 1 / 10</div>
+              <button class="btn btn--ghost btn--small" id="tr-abort">中止</button>
+            </div>
+          </header>
+          <div class="test-runner__progress"><div class="test-runner__progress-fill" id="tr-prog"></div></div>
+          <div class="test-runner__body" id="tr-body"></div>
+          <footer class="test-runner__foot">
+            <button class="btn btn--secondary" id="tr-skip">スキップ <kbd class="kbd-on-btn">S</kbd></button>
+            <div class="test-runner__foot-right">
+              <button class="btn btn--primary" id="tr-submit">提出</button>
+            </div>
+          </footer>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- View: Test result (after session)              -->
+      <!-- ============================================== -->
+      <section class="view view--test-result" data-view="test-result">
+        <div class="view__inner">
+          <div class="test-result" id="tr-result"></div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- View: History                                  -->
+      <!-- ============================================== -->
+      <section class="view view--history" data-view="history">
+        <div class="view__inner">
+          <header class="page-head">
+            <span class="kicker"><span class="dot"></span> History</span>
+            <h1>学習履歴</h1>
+            <p class="page-head__sub">テスト結果と章クリアの履歴を時系列で。</p>
+          </header>
+          <div class="history" id="history-list">
+            <div class="history__empty">履歴はまだありません。最初のテストを受けてみましょう。</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- View: Placeholder for practice / references / settings -->
+      <!-- ============================================== -->
+      <section class="view view--practice" data-view="practice">
+        <div class="view__inner">
+          <header class="page-head">
+            <span class="kicker"><span class="dot"></span> Practice</span>
+            <h1>練習問題</h1>
+            <p class="page-head__sub">各章のコードを読んで選択肢から正解を選ぶ Reading 問題です。理解度の確認や復習に。</p>
+          </header>
+          <div class="practice-grid" id="practice-grid">
+            <div class="practice-empty">問題を読み込んでいます…</div>
+          </div>
+        </div>
+      </section>
+      <section class="view view--references" data-view="references">
+        <div class="view__inner">
+          <header class="page-head">
+            <span class="kicker"><span class="dot"></span> References</span>
+            <h1>リファレンス</h1>
+            <p class="page-head__sub">学習で頻出する標準ライブラリ・パッケージの早見表。検索ボックスで絞り込めます。</p>
+          </header>
+          <div class="ref-controls">
+            <input id="ref-search" type="text" placeholder="関数名・キーワードで検索…（例: range, DataFrame, plt）" />
+            <div class="ref-cats" id="ref-cats"></div>
+          </div>
+          <div class="ref-sections" id="ref-sections"></div>
+        </div>
+      </section>
+      <section class="view view--settings" data-view="settings">
+        <div class="view__inner">
+          <header class="page-head">
+            <span class="kicker"><span class="dot"></span> Settings</span>
+            <h1>設定</h1>
+            <p class="page-head__sub">テーマ・ショートカット・API キーなどを変更できます。</p>
+          </header>
+
+          <section class="settings-section">
+            <div class="settings-section__head">
+              <h3>テーマ</h3>
+              <span class="card__hint">アプリ全体の配色</span>
+            </div>
+            <div class="theme-picker" id="theme-picker">
+              <label class="theme-card" data-theme="dark">
+                <input type="radio" name="theme" value="dark" />
+                <div class="theme-card__preview theme-card__preview--dark">
+                  <div class="tcp tcp--header"></div>
+                  <div class="tcp tcp--body">
+                    <div class="tcp__accent"></div>
+                    <div class="tcp__line"></div>
+                    <div class="tcp__line tcp__line--short"></div>
+                  </div>
+                </div>
+                <div class="theme-card__label">
+                  <span class="theme-card__name">ダーク</span>
+                  <span class="theme-card__sub">黒基調 · デフォルト</span>
+                </div>
+              </label>
+
+              <label class="theme-card" data-theme="light">
+                <input type="radio" name="theme" value="light" />
+                <div class="theme-card__preview theme-card__preview--light">
+                  <div class="tcp tcp--header"></div>
+                  <div class="tcp tcp--body">
+                    <div class="tcp__accent"></div>
+                    <div class="tcp__line"></div>
+                    <div class="tcp__line tcp__line--short"></div>
+                  </div>
+                </div>
+                <div class="theme-card__label">
+                  <span class="theme-card__name">ライト</span>
+                  <span class="theme-card__sub">白基調 · 明るい部屋向き</span>
+                </div>
+              </label>
+
+              <label class="theme-card" data-theme="system">
+                <input type="radio" name="theme" value="system" />
+                <div class="theme-card__preview theme-card__preview--system">
+                  <div class="tcp tcp--header"></div>
+                  <div class="tcp tcp--body">
+                    <div class="tcp__accent"></div>
+                    <div class="tcp__line"></div>
+                    <div class="tcp__line tcp__line--short"></div>
+                  </div>
+                </div>
+                <div class="theme-card__label">
+                  <span class="theme-card__name">システム</span>
+                  <span class="theme-card__sub">OS の設定に追従</span>
+                </div>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <div class="settings-section__head">
+              <h3>キーボードショートカット</h3>
+              <span class="card__hint">Ctrl + キー で各画面へ移動</span>
+            </div>
+            <div class="settings-shortcuts">
+              <div><kbd>Ctrl</kbd><kbd>K</kbd> <span>コマンドパレット</span></div>
+              <div><kbd>Ctrl</kbd><kbd>B</kbd> <span>サイドバーを切替</span></div>
+              <div><kbd>Ctrl</kbd><kbd>1</kbd> <span>ダッシュボード</span></div>
+              <div><kbd>Ctrl</kbd><kbd>2</kbd> <span>章一覧</span></div>
+              <div><kbd>Ctrl</kbd><kbd>4</kbd> <span>実力テスト</span></div>
+              <div><kbd>Ctrl</kbd><kbd>5</kbd> <span>学習履歴</span></div>
+              <div><kbd>?</kbd> <span>このヘルプ</span></div>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <div class="settings-section__head">
+              <h3>データの管理</h3>
+              <span class="card__hint">学習進捗・提出履歴・テスト結果</span>
+            </div>
+            <div class="danger-zone">
+              <div class="danger-zone__txt">
+                <div class="danger-zone__title">学習履歴を初期化</div>
+                <div class="danger-zone__sub">章の進捗・演習の提出履歴・実力テストの結果をすべて削除します。この操作は取り消せません。</div>
+              </div>
+              <button class="btn btn--danger" id="btn-clear-data">学習履歴を初期化</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- Confirmation modal for destructive data clear -->
+      <div class="modal" id="confirm-clear" hidden>
+        <div class="modal__scrim"></div>
+        <div class="modal__panel">
+          <h2>学習履歴を初期化しますか？</h2>
+          <p>章の進捗、提出履歴、実力テストの結果がすべて削除されます。<br/><strong>この操作は取り消せません。</strong></p>
+          <div class="modal__actions">
+            <button class="btn btn--ghost" id="confirm-clear-cancel">キャンセル</button>
+            <button class="btn btn--danger"  id="confirm-clear-ok">削除する</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status bar -->
+      <footer class="statusbar">
+        <span class="dot is-success"></span>
+        <span class="status-text" id="status-kernel">kernel: ready</span>
+        <span class="status-sep">·</span>
+        <span class="status-text">Python 3.12</span>
+        <span class="status-sep">·</span>
+        <span class="status-text">UTF-8</span>
+      </footer>
+    </main>
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- Command palette                                            -->
+  <!-- ========================================================== -->
+  <div class="palette" id="palette" hidden>
+    <div class="palette__scrim"></div>
+    <div class="palette__panel">
+      <div class="palette__search">
+        <span class="palette__glyph">⌕</span>
+        <input id="palette-input" type="text" placeholder="コマンドや章名を検索…" />
+        <kbd class="palette__esc">Esc</kbd>
+      </div>
+      <div class="palette__list" id="palette-list"></div>
+      <div class="palette__foot">
+        <span id="palette-count">0 件</span>
+        <span class="palette__legend">
+          選択 <kbd>↑</kbd><kbd>↓</kbd> &nbsp;
+          実行 <kbd>↵</kbd> &nbsp;
+          閉じる <kbd>Esc</kbd>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- Help overlay                                               -->
+  <!-- ========================================================== -->
+  <div class="help" id="help" hidden>
+    <div class="help__scrim"></div>
+    <div class="help__panel">
+      <h2>ショートカット</h2>
+      <hr/>
+      <div class="help__cols">
+        <div>
+          <div class="help__group">ナビゲーション</div>
+          <div class="help__row"><kbd>Ctrl</kbd><kbd>K</kbd><span>コマンドパレット</span></div>
+          <div class="help__row"><kbd>Ctrl</kbd><kbd>B</kbd><span>サイドバーを切替</span></div>
+          <div class="help__row"><kbd>Ctrl</kbd><kbd>1</kbd><span>ダッシュボード</span></div>
+          <div class="help__row"><kbd>Ctrl</kbd><kbd>2</kbd><span>章一覧</span></div>
+          <div class="help__row"><kbd>Ctrl</kbd><kbd>4</kbd><span>実力テスト</span></div>
+          <div class="help__row"><kbd>Ctrl</kbd><kbd>5</kbd><span>学習履歴</span></div>
+          <div class="help__row"><kbd>?</kbd><span>このヘルプ</span></div>
+        </div>
+        <div>
+          <div class="help__group">ページ操作</div>
+          <div class="help__row"><kbd>↵</kbd><span>実行 / 提出</span></div>
+          <div class="help__row"><kbd>Esc</kbd><span>閉じる / 戻る</span></div>
+          <div class="help__row"><kbd>←</kbd><span>前のページ</span></div>
+          <div class="help__row"><kbd>→</kbd><span>次のページ</span></div>
+          <div class="help__row"><kbd>↑</kbd><kbd>↓</kbd><span>選択を移動</span></div>
+          <div class="help__row"><kbd>Tab</kbd><span>次のフィールド</span></div>
+        </div>
+      </div>
+      <div class="help__foot">Esc で閉じる</div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
-    QStackedLayout,
     QVBoxLayout,
     QWidget,
 )
@@ -27,8 +26,11 @@ from ..resources.theme import (
     BG,
     INK,
     INK_3,
+    INK_4,
+    INK_5,
     LINE,
     LINE_STRONG,
+    LINE_SUBTLE,
     PHASE_LABELS,
     SURFACE,
 )
@@ -37,6 +39,8 @@ from .pages.reading_page import ReadingPageWidget
 from .pages.result_page import ResultPageWidget
 from .pages.sample_page import SamplePageWidget
 from .stickman import StickmanStrip
+from .widgets.fade_stack import FadeStack
+from .widgets.kbd import KbdCombo
 
 
 def _phase_label(phase: str) -> str:
@@ -64,46 +68,43 @@ class ChapterView(QWidget):
         self.kernel = kernel
         self.llm = llm
 
-        # Single combined header row — left-aligned wordmark + breadcrumb,
-        # right-aligned page counter + back button. Sharper, no centered text.
+        # Single combined header row — left-aligned phase chevron breadcrumb,
+        # right-aligned page dots / counter / close. Arc-style chevron sep.
         header = QFrame(self)
         header.setObjectName("chapterHeader")
-        header.setFixedHeight(58)
+        header.setFixedHeight(56)
         header.setStyleSheet(
             f"#chapterHeader {{ background: {BG}; border-bottom: 1px solid {LINE}; }}"
         )
         head_layout = QHBoxLayout(header)
-        # 8px bottom margin gives the page counter breathing room above the
-        # 2px red progress rule — without it the "06" descender visually
-        # touches the rule.
-        head_layout.setContentsMargins(32, 0, 32, 8)
-        head_layout.setSpacing(16)
+        head_layout.setContentsMargins(28, 0, 18, 6)
+        head_layout.setSpacing(10)
 
-        # Brand wordmark intentionally omitted — the sidebar / breadcrumb
-        # already carry "Study Python for Finance". Within the chapter view
-        # we go straight to the chapter context (Phase / Ch / Title).
+        # Tiny red dot indicating "live phase context"
+        red_dot = QFrame(header)
+        red_dot.setFixedSize(6, 6)
+        red_dot.setStyleSheet(f"background: {ACCENT}; border: none;")
+        head_layout.addWidget(red_dot, 0, Qt.AlignmentFlag.AlignVCenter)
+
         phase_lbl = QLabel(_phase_label(chapter.phase), header)
         phase_lbl.setStyleSheet(
-            f"color: {ACCENT}; font-size: 11px; font-weight: 700; letter-spacing: 0;"
+            f"color: {INK_3}; font-size: 11px; font-weight: 700; letter-spacing: 0.2px;"
         )
         head_layout.addWidget(phase_lbl)
 
-        # Visible separator between PHASE and CH
-        sep_b = QFrame(header)
-        sep_b.setStyleSheet(f"background: {LINE};")
-        sep_b.setFixedSize(1, 18)
+        # Chevron separator
+        sep_b = QLabel("›", header)
+        sep_b.setStyleSheet(f"color: {INK_5}; font-size: 14px; font-weight: 600;")
         head_layout.addWidget(sep_b)
 
         ch_num = QLabel(f"Ch {chapter.id:02d}", header)
         ch_num.setStyleSheet(
-            f"color: {INK_3}; font-size: 11px; font-weight: 700; letter-spacing: 0;"
+            f"color: {INK_3}; font-size: 11px; font-weight: 700; letter-spacing: 0.2px;"
         )
         head_layout.addWidget(ch_num)
 
-        # Visible separator between CH and TITLE
-        sep_c = QFrame(header)
-        sep_c.setStyleSheet(f"background: {LINE};")
-        sep_c.setFixedSize(1, 18)
+        sep_c = QLabel("›", header)
+        sep_c.setStyleSheet(f"color: {INK_5}; font-size: 14px; font-weight: 600;")
         head_layout.addWidget(sep_c)
 
         title_lbl = QLabel(chapter.title, header)
@@ -112,24 +113,31 @@ class ChapterView(QWidget):
         )
         head_layout.addWidget(title_lbl, 1)
 
-        # Separator before page counter
-        sep_d = QFrame(header)
-        sep_d.setStyleSheet(f"background: {LINE};")
-        sep_d.setFixedSize(1, 18)
-        head_layout.addWidget(sep_d)
+        # Page progress dots (compact, ≤ 16 pages) — laid out into _dots_holder
+        self._dots_holder = QFrame(header)
+        self._dots_holder.setStyleSheet("background: transparent; border: none;")
+        self._dots_layout = QHBoxLayout(self._dots_holder)
+        self._dots_layout.setContentsMargins(0, 0, 0, 0)
+        self._dots_layout.setSpacing(4)
+        head_layout.addWidget(self._dots_holder, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        # Right side: page counter + back
+        sep_d = QLabel("·", header)
+        sep_d.setStyleSheet(f"color: {INK_5}; font-size: 12px; font-weight: 600;")
+        head_layout.addWidget(sep_d, 0, Qt.AlignmentFlag.AlignVCenter)
+
         self._page_count_lbl = QLabel("", header)
         self._page_count_lbl.setStyleSheet(
-            f"color: {INK_3}; font-size: 11px; font-weight: 700; letter-spacing: 0.2px;"
-            f" padding: 4px 12px 4px 0;"
+            f"color: {INK_3}; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;"
         )
         head_layout.addWidget(self._page_count_lbl, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        self._back_btn = QPushButton("Close", header)
-        self._back_btn.setProperty("variant", "secondary")
+        self._back_btn = QPushButton("閉じる", header)
         self._back_btn.setStyleSheet(
-            "QPushButton { padding: 5px 14px; font-size: 11px; min-width: 64px; }"
+            f"QPushButton {{ background: transparent; color: {INK_3};"
+            f" border: 1px solid {LINE}; border-radius: 0;"
+            f" padding: 5px 14px; font-size: 11px; font-weight: 700;"
+            f" min-width: 0; min-height: 0; }}"
+            f"QPushButton:hover {{ color: {INK}; border-color: {LINE_STRONG}; }}"
         )
         self._back_btn.clicked.connect(self.back_to_launcher.emit)
         head_layout.addWidget(self._back_btn)
@@ -140,22 +148,18 @@ class ChapterView(QWidget):
         self._progress.setTextVisible(False)
         self._progress.setFixedHeight(2)
 
-        # Body slot — flat BG so the page content sits on the same surface
-        # as the header/footer; only hairlines demarcate regions (Linear style).
+        # Body slot — flat BG with cross-fade between pages (Arc-style).
         self._slot_container = QWidget(self)
         self._slot_container.setStyleSheet(f"background: {BG};")
-        self._slot_layout = QStackedLayout(self._slot_container)
+        self._slot_layout = FadeStack(self._slot_container)
         self._slot_layout.setContentsMargins(0, 0, 0, 0)
 
         # Footer
         self._footer = QFrame(self)
         self._footer.setStyleSheet(f"QFrame {{ background: {BG}; border-top: 1px solid {LINE}; }}")
         foot_layout = QHBoxLayout(self._footer)
-        foot_layout.setContentsMargins(32, 10, 32, 10)
-        # Footer buttons get explicit inline styles. The global QSS gets
-        # suppressed in some embedded-stack contexts which produced an
-        # unreadable white-on-white button — see result_page.py for the
-        # canonical primary/secondary stylesheets that we mirror here.
+        foot_layout.setContentsMargins(28, 10, 28, 10)
+        foot_layout.setSpacing(8)
         _primary_qss = (
             "QPushButton {"
             f" background: {ACCENT}; color: white; border: 1px solid {ACCENT};"
@@ -169,20 +173,24 @@ class ChapterView(QWidget):
         )
         _secondary_qss = (
             "QPushButton {"
-            f" background: #141414; color: {INK}; border: 1px solid {INK};"
+            f" background: #141414; color: {INK}; border: 1px solid {LINE_STRONG};"
             " border-radius: 0; padding: 8px 22px; font-size: 11px;"
             " font-weight: 700; min-width: 96px; min-height: 24px;"
             " }"
-            f"QPushButton:hover {{ background: {INK}; color: white; }}"
+            f"QPushButton:hover {{ background: {INK}; color: #141414; border-color: {INK}; }}"
             "QPushButton:disabled {"
             f" background: #141414; color: {LINE}; border-color: {LINE}; }}"
         )
-        self._prev_btn = QPushButton("Back", self._footer)
+        self._prev_btn = QPushButton("戻る", self._footer)
         self._prev_btn.setStyleSheet(_secondary_qss)
         self._prev_btn.clicked.connect(self._go_prev)
         foot_layout.addWidget(self._prev_btn)
+        prev_kbd = KbdCombo(["←"], self._footer, muted=True)
+        foot_layout.addWidget(prev_kbd, 0, Qt.AlignmentFlag.AlignVCenter)
         foot_layout.addStretch(1)
-        self._next_btn = QPushButton("Next", self._footer)
+        next_kbd = KbdCombo(["↵"], self._footer, muted=True)
+        foot_layout.addWidget(next_kbd, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._next_btn = QPushButton("次へ", self._footer)
         self._next_btn.setStyleSheet(_primary_qss)
         self._next_btn.clicked.connect(self._on_next_clicked)
         foot_layout.addWidget(self._next_btn)
@@ -228,11 +236,10 @@ class ChapterView(QWidget):
 
     # ------------------------------------------------------------------
     def _swap_slot(self, widget: QWidget) -> None:
-        while self._slot_layout.count():
-            w = self._slot_layout.widget(0)
-            self._slot_layout.removeWidget(w)
-            w.setParent(None)
-        self._slot_layout.addWidget(widget)
+        # Keep previously-added widgets resident so we can fade between
+        # them — adding the same widget twice is a no-op in QStackedLayout.
+        if self._slot_layout.indexOf(widget) == -1:
+            self._slot_layout.addWidget(widget)
         self._slot_layout.setCurrentWidget(widget)
 
     def _current_page_model(self):
@@ -250,25 +257,49 @@ class ChapterView(QWidget):
         self._page_count_lbl.setText(
             f"{self._current_index + 1:02d} / {len(self.chapter.pages):02d}"
         )
+        self._refresh_page_dots()
 
         page = self._current_page_model()
         if isinstance(page, SamplePage):
             self._stickman.set_mood(page.stickman)
             self._stickman.set_speech(page.stickman_speech)
-            self._next_btn.setText("Next")
+            self._next_btn.setText("次へ")
             self._next_btn.setEnabled(True)
         elif isinstance(page, ExercisePage):
             self._stickman.set_mood("explain")
             self._stickman.set_speech("コードの空欄を埋めて提出ボタンを押そう。")
-            # On exercise pages, the footer button SUBMITS the answer.
-            self._next_btn.setText("Submit")
+            self._next_btn.setText("提出")
             self._next_btn.setEnabled(True)
         elif isinstance(page, ReadingPage):
             self._stickman.set_mood(page.stickman)
             self._stickman.set_speech(page.stickman_speech)
-            self._next_btn.setText("Submit")
+            self._next_btn.setText("提出")
             self._next_btn.setEnabled(True)
         self._prev_btn.setEnabled(self._current_index > 0)
+
+    def _refresh_page_dots(self) -> None:
+        # Clear existing dots
+        while self._dots_layout.count():
+            it = self._dots_layout.takeAt(0)
+            w = it.widget()
+            if w is not None:
+                w.deleteLater()
+        total = len(self.chapter.pages)
+        # Render dots only when page count is small (≤ 16); otherwise we'd
+        # get a cramped row. The "n / m" counter to the right keeps context.
+        if total > 16:
+            return
+        for i in range(total):
+            dot = QFrame(self._dots_holder)
+            dot.setFixedSize(5, 5)
+            if i < self._current_index:
+                color = ACCENT
+            elif i == self._current_index:
+                color = ACCENT
+            else:
+                color = LINE_STRONG
+            dot.setStyleSheet(f"background: {color}; border: none;")
+            self._dots_layout.addWidget(dot)
 
     def _save_progress(self, *, completed: bool = False) -> None:
         self.repo.upsert_progress(

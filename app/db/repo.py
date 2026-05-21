@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import (
@@ -188,6 +188,31 @@ class Repository:
             s.commit()
             s.refresh(row)
             return row.id
+
+    def clear_user_data(self, user_id: int) -> dict[str, int]:
+        """Wipe all chapter progress, submissions and test results for a user.
+
+        Returns a count summary so the caller can show "N rows removed".
+        The user row itself is preserved.
+        """
+        from sqlalchemy import delete  # local import to avoid cycles
+        with self.session() as s:
+            p_count  = s.scalar(select(func.count()).select_from(ChapterProgress)
+                                .where(ChapterProgress.user_id == user_id)) or 0
+            s_count  = s.scalar(select(func.count()).select_from(CellSubmission)
+                                .where(CellSubmission.user_id == user_id)) or 0
+            t_count  = s.scalar(select(func.count()).select_from(TestResult)
+                                .where(TestResult.user_id == user_id)) or 0
+
+            s.execute(delete(ChapterProgress).where(ChapterProgress.user_id == user_id))
+            s.execute(delete(CellSubmission ).where(CellSubmission.user_id  == user_id))
+            s.execute(delete(TestResult     ).where(TestResult.user_id      == user_id))
+            s.commit()
+            return {
+                "chapter_progress": int(p_count),
+                "submissions":      int(s_count),
+                "test_results":     int(t_count),
+            }
 
     def list_test_results(self, user_id: int) -> list[TestResult]:
         with self.session() as s:

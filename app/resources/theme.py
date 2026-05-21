@@ -40,6 +40,18 @@ BG_ALT      = SURFACE        # legacy alias kept for compat
 LINE        = "#262626"      # hairline border
 LINE_STRONG = "#404040"      # stronger dividers (e.g. between header and body)
 LINE_TINT   = "#1F1F1F"      # ultra-subtle line
+LINE_SUBTLE = "#1A1A1A"      # nearly-invisible split (used inside cards)
+LINE_FOCUS  = "#5B5B5B"      # neutral inner outline (Arc-style elevation)
+
+# Subtle blue — focus ring & link state only (Arc/Raycast accent restraint)
+INK_BLUE      = "#7DA9FF"
+INK_BLUE_SOFT = "#0E141F"
+FOCUS_RING    = INK_BLUE     # 1px outline on :focus targets
+
+# Elevation tiers (no shadows; we tone borders instead)
+SURFACE_HI    = "#181818"    # CommandPalette / hover-rich panels
+SURFACE_GLASS = "rgba(20, 20, 20, 0.92)"  # overlay layer
+OVERLAY_SCRIM = "rgba(0, 0, 0, 0.55)"     # modal backdrop
 
 # Status
 SUCCESS = "#10B981"          # emerald-500
@@ -331,5 +343,91 @@ QFrame[variant="rule-strong"] {{
 QFrame[variant="rule-accent"] {{
     background: {ACCENT};
     max-height: 2px; min-height: 2px; border: none;
+}}
+QFrame[variant="rule-subtle"] {{
+    background: {LINE_SUBTLE};
+    max-height: 1px; min-height: 1px; border: none;
+}}
+
+/* Keyboard cap ---------------------------------------------------------- */
+
+QLabel[kbd="true"] {{
+    background: {SURFACE_ALT};
+    color: {INK_2};
+    border: 1px solid {LINE_STRONG};
+    border-bottom: 2px solid {LINE_STRONG};
+    border-radius: 0px;
+    font-family: {FONT_MONO};
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px 0 5px;
+    min-width: 12px;
+    letter-spacing: 0;
+}}
+
+QLabel[kbd="true"][kbdMuted="true"] {{
+    color: {INK_4};
+    border-color: {LINE};
+    border-bottom-color: {LINE};
+}}
+
+/* Hoverable rows / cards (Raycast row feel) ----------------------------- */
+
+QFrame[hoverable="true"] {{
+    background: transparent;
+}}
+QFrame[hoverable="true"]:hover {{
+    background: {SURFACE_TINT};
+}}
+
+/* Inner-glow panel (Arc-style elevation; nested 1px frame, radius 0) ---- */
+
+QFrame[panel="glass"] {{
+    background: {SURFACE_HI};
+    border: 1px solid {LINE_STRONG};
+    border-radius: 0px;
+}}
+
+QFrame[panel="raised"] {{
+    background: {SURFACE};
+    border: 1px solid {LINE};
+    border-radius: 0px;
+}}
+
+QFrame[panel="raised-accent"] {{
+    background: {SURFACE};
+    border: 1px solid {LINE_SUBTLE};
+    border-left: 2px solid {ACCENT};
+    border-radius: 0px;
+}}
+
+/* Tag / pill (Arc-style metadata chip) ---------------------------------- */
+
+QLabel[tag="true"] {{
+    background: {SURFACE_ALT};
+    border: 1px solid {LINE};
+    color: {INK_3};
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 2px 7px;
+    border-radius: 0px;
+}}
+QLabel[tag="accent"] {{
+    background: {ACCENT_TINT};
+    border: 1px solid {ACCENT};
+    color: {ACCENT_HOVER};
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 2px 7px;
+    border-radius: 0px;
+}}
+
+/* Focus rings (subtle blue, only when focused) -------------------------- */
+
+QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus,
+QTextBrowser:focus, QComboBox:focus {{
+    border: 1px solid {FOCUS_RING};
 }}
 """

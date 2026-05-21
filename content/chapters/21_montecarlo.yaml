@@ -68,7 +68,12 @@ pages:
   - kind: exercise
     title: "GBM で満期株価を生成しよう"
     prompt: |
-      `(μ − σ²/2)·T + σ·√T·Z` の指数を計算する式を完成させてください。
+      満期株価は次の対数正規モデルで与えられます：
+
+      $$ S_T = S_0 \exp\!\Bigl( \bigl(\mu - \tfrac{\sigma^2}{2}\bigr) T + \sigma \sqrt{T}\, Z \Bigr) $$
+
+      ここで $Z \sim \mathcal{N}(0, 1)$ は標準正規乱数です。
+      下のコードの空欄に **ドリフト補正項 $(\mu - \sigma^2/2)\, T$** を Python で書いてください。
     code_template: |
       import numpy as np
       np.random.seed(42)

@@ -165,7 +165,6 @@ class ContinueCard(QFrame):
         tag.setStyleSheet(
             f"color: {ACCENT}; background: transparent;"
             f" font-size: 10px; font-weight: 800; letter-spacing: 0;"
-            f" font-family: {FONT_MONO};"
         )
         top.addWidget(tag)
         top.addStretch(1)
@@ -173,7 +172,6 @@ class ContinueCard(QFrame):
         save_lbl.setStyleSheet(
             f"color: {INK_4}; background: transparent;"
             f" font-size: 9px; font-weight: 700; letter-spacing: 0;"
-            f" font-family: {FONT_MONO};"
         )
         top.addWidget(save_lbl)
         layout.addLayout(top)
@@ -192,8 +190,7 @@ class ContinueCard(QFrame):
             sub.setStyleSheet(
                 f"color: {INK_3}; background: transparent;"
                 f" font-size: 11px; font-weight: 700; letter-spacing: 0;"
-                f" font-family: {FONT_MONO};"
-            )
+                )
             layout.addWidget(sub)
         else:
             title = QLabel(last_chapter.title, self)
@@ -214,8 +211,7 @@ class ContinueCard(QFrame):
             crumb.setStyleSheet(
                 f"color: {INK_3}; background: transparent;"
                 f" font-size: 11px; font-weight: 700; letter-spacing: 0;"
-                f" font-family: {FONT_MONO};"
-            )
+                )
             layout.addWidget(crumb)
 
         layout.addStretch(1)
@@ -235,7 +231,6 @@ class ContinueCard(QFrame):
         cta_label.setStyleSheet(
             f"color: {ACCENT}; background: transparent;"
             f" font-size: 11px; font-weight: 800; letter-spacing: 0;"
-            f" font-family: {FONT_MONO};"
         )
         cta_row.addWidget(cta_label)
         cta_row.addStretch(1)
@@ -311,7 +306,6 @@ class StatRow(QFrame):
         val.setStyleSheet(
             f"color: {color}; background: transparent;"
             f" font-size: 18px; font-weight: 800;"
-            f" font-family: {FONT_MONO};"
         )
         val.setFixedWidth(44)
         val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -366,7 +360,6 @@ class ActionRow(QFrame):
         idx_lbl.setStyleSheet(
             f"color: {INK_4}; background: transparent;"
             f" font-size: 11px; font-weight: 800; letter-spacing: 0;"
-            f" font-family: {FONT_MONO};"
         )
         idx_lbl.setMinimumWidth(36)
         layout.addWidget(idx_lbl, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -437,7 +430,6 @@ class ChapterRow(QFrame):
         num.setStyleSheet(
             f"color: {INK}; background: transparent;"
             f" font-size: 16px; font-weight: 800; letter-spacing: -0.5px;"
-            f" font-family: {FONT_MONO};"
         )
         num.setMinimumWidth(32)
         layout.addWidget(num, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -596,7 +588,6 @@ class LauncherScreen(QWidget):
         sys_lbl.setStyleSheet(
             f"color: {INK_3}; background: transparent;"
             f" font-size: 9px; font-weight: 700; letter-spacing: 0;"
-            f" font-family: {FONT_MONO};"
         )
         head_row.addWidget(sys_lbl)
         s_layout.addLayout(head_row)

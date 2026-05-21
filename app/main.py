@@ -1,19 +1,25 @@
 """Application entrypoint.
 
-Hosts the Linear-style ``AppShell`` (sidebar + top bar + status bar) and
-swaps Dashboard / Chapter picker / Test / History / ChapterView into the
-content stack on demand.
+By default boots the **Web shell** (`QWebEngineView` hosting `app/web/`)
+which renders a Figma-quality HTML/CSS UI. Set the environment variable
+``STUDYPY_LEGACY_UI=1`` to fall back to the legacy PyQt6/QSS shell.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFontDatabase, QGuiApplication
+from PyQt6.QtCore import Qt, QCoreApplication
+# QtWebEngine must be imported before QApplication construction so its
+# OpenGL contexts share correctly with the rest of the UI.
+QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+import PyQt6.QtWebEngineWidgets  # noqa: F401  (side-effect: registers QtWebEngine)
+
+from PyQt6.QtGui import QFontDatabase, QGuiApplication, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -29,6 +35,9 @@ from .kernel.manager import KernelSession
 from .llm.claude_client import ClaudeClient
 from .resources.theme import GLOBAL_STYLESHEET
 from .ui.chapter_view import ChapterView
+from .ui.command_actions import Action, CommandRegistry
+from .ui.command_palette import CommandPalette
+from .ui.help_overlay import HelpOverlay
 from .ui.history_view import HistoryView
 from .ui.shell import AppShell
 from .ui.test_view import TestView
@@ -190,10 +199,24 @@ class MainWindow(QMainWindow):
         # Update sidebar mini progress card
         self._refresh_mini_progress()
 
+        # Command palette + help overlay (Ctrl+K / Ctrl+B / ?)
+        self._cmd_registry = CommandRegistry()
+        self._palette: CommandPalette | None = None
+        self._help_overlay: HelpOverlay | None = None
+        self._register_default_actions()
+        self._install_shortcuts()
+
+        # Hook the topbar "search" button (added in shell.py) to open palette
+        if hasattr(self.shell.topbar, "set_palette_handler"):
+            self.shell.topbar.set_palette_handler(self._open_command_palette)
+        if hasattr(self.shell.sidebar, "set_palette_handler"):
+            self.shell.sidebar.set_palette_handler(self._open_command_palette)
+
         # Start kernel asynchronously-ish (blocking but quick).
         try:
             self.kernel.start()
             self.shell.statusbar.set_kernel_state("ready")
+            self.shell.topbar.set_kernel_state("ready")
         except Exception as e:  # noqa: BLE001
             logging.exception("kernel start failed")
             QMessageBox.critical(
@@ -202,6 +225,7 @@ class MainWindow(QMainWindow):
                 f"Jupyter kernel を起動できませんでした:\n{e}",
             )
             self.shell.statusbar.set_kernel_state("error", str(e)[:40])
+            self.shell.topbar.set_kernel_state("error")
 
     # ------------------------------------------------------------------
     def _navigate_to(self, slug: str) -> None:
@@ -344,6 +368,156 @@ class MainWindow(QMainWindow):
                 chap = "新しい章から始めよう"
         self.shell.sidebar.set_mini_progress(label, pct, chap)
 
+    # ------------------------------------------------------------------
+    # Command palette / shortcuts
+    # ------------------------------------------------------------------
+    def _install_shortcuts(self) -> None:
+        self._sc_palette = QShortcut(QKeySequence("Ctrl+K"), self)
+        self._sc_palette.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self._sc_palette.activated.connect(self._open_command_palette)
+
+        self._sc_sidebar = QShortcut(QKeySequence("Ctrl+B"), self)
+        self._sc_sidebar.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self._sc_sidebar.activated.connect(self._toggle_sidebar)
+
+        self._sc_help = QShortcut(QKeySequence("?"), self)
+        self._sc_help.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self._sc_help.activated.connect(self._show_help_overlay)
+
+        # Numeric quick-nav (Ctrl+1〜5)
+        nav_keys = [
+            ("Ctrl+1", "dashboard"),
+            ("Ctrl+2", "chapters"),
+            ("Ctrl+3", "practice"),
+            ("Ctrl+4", "tests"),
+            ("Ctrl+5", "history"),
+        ]
+        self._sc_nav: list[QShortcut] = []
+        for seq, slug in nav_keys:
+            sc = QShortcut(QKeySequence(seq), self)
+            sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            sc.activated.connect(lambda _slug=slug: self._on_nav(_slug))
+            self._sc_nav.append(sc)
+
+    def _toggle_sidebar(self) -> None:
+        sb = self.shell.sidebar
+        sb.setVisible(not sb.isVisible())
+
+    def _open_command_palette(self) -> None:
+        # Rebuild dynamic chapter actions each time the palette opens so the
+        # progress flags stay accurate.
+        self._refresh_chapter_actions()
+        if self._palette is None:
+            self._palette = CommandPalette(self._cmd_registry, self)
+        self._palette.show()
+        self._palette.raise_()
+        self._palette.activateWindow()
+
+    def _show_help_overlay(self) -> None:
+        if self._help_overlay is None:
+            self._help_overlay = HelpOverlay(self)
+        self._help_overlay.show()
+        self._help_overlay.raise_()
+        self._help_overlay.activateWindow()
+
+    def _register_default_actions(self) -> None:
+        nav = [
+            ("nav.dashboard", "ダッシュボードを開く", "▣", "Continue & 進捗",
+             ("Ctrl", "1"), ("dashboard","ホーム","home")),
+            ("nav.chapters",  "章一覧を開く",          "□", "Phase A〜F",
+             ("Ctrl", "2"), ("chapters","章","browse")),
+            ("nav.practice",  "練習問題を開く",        "◇", "Phase 横断",
+             ("Ctrl", "3"), ("practice","練習")),
+            ("nav.tests",     "実力テストを受ける",    "✓", "Phase 別 10 問",
+             ("Ctrl", "4"), ("tests","テスト","quiz")),
+            ("nav.history",   "学習履歴を見る",        "≡", "過去のスコア",
+             ("Ctrl", "5"), ("history","履歴","log")),
+            ("nav.references","リファレンスを開く",    "✎", "標準ライブラリ早見",
+             None, ("references","ref","help")),
+            ("nav.settings",  "設定を開く",            "⚙", "テーマ・API",
+             None, ("settings","preferences")),
+        ]
+        for slug_id, title, icon, sub, sc, kws in nav:
+            target = slug_id.removeprefix("nav.")
+            self._cmd_registry.register(Action(
+                id=slug_id,
+                title=title,
+                group="ナビゲート",
+                icon=icon,
+                subtitle=sub,
+                shortcut=sc,
+                keywords=kws,
+                run=lambda s=target: self._on_nav(s),
+            ))
+
+        self._cmd_registry.register(Action(
+            id="resume",
+            title="つづきから再開",
+            group="ナビゲート",
+            icon="▶",
+            subtitle="最後の章/ページから",
+            shortcut=("Ctrl", "R"),
+            keywords=("resume","continue","再開"),
+            run=self._on_resume,
+        ))
+
+        # Help
+        self._cmd_registry.register(Action(
+            id="help.shortcuts",
+            title="ショートカット一覧",
+            group="ヘルプ",
+            icon="?",
+            subtitle="キーボード操作",
+            shortcut=("?",),
+            keywords=("help","shortcuts","ヘルプ"),
+            run=self._show_help_overlay,
+        ))
+        self._cmd_registry.register(Action(
+            id="ui.toggle_sidebar",
+            title="サイドバーを切替",
+            group="ヘルプ",
+            icon="◧",
+            subtitle="表示/非表示",
+            shortcut=("Ctrl", "B"),
+            keywords=("sidebar","toggle"),
+            run=self._toggle_sidebar,
+        ))
+
+        # Tests (one action per available test set)
+        for ts in self.test_sets.values():
+            self._cmd_registry.register(Action(
+                id=f"test.{ts.id}",
+                title=f"テスト: {ts.title}",
+                group="テスト",
+                icon="✓",
+                subtitle=f"Phase {ts.phase} · {len(ts.questions)} 問 · {ts.time_limit_minutes} 分",
+                shortcut=None,
+                keywords=(f"phase {ts.phase}", ts.id, "test"),
+                run=lambda tid=ts.id: self._open_test(tid),
+            ))
+
+        # Chapters (dynamic)
+        self._refresh_chapter_actions()
+
+    def _refresh_chapter_actions(self) -> None:
+        for ch in self.chapters:
+            kws: tuple[str, ...] = (
+                f"phase {ch.phase}",
+                f"ch{ch.id:02d}",
+                str(ch.id),
+                ch.title,
+            )
+            self._cmd_registry.register(Action(
+                id=f"chapter.{ch.id}",
+                title=f"第 {ch.id:02d} 章 {ch.title}",
+                group="章",
+                icon="❯",
+                subtitle=f"Phase {ch.phase}",
+                shortcut=None,
+                keywords=kws,
+                run=lambda cid=ch.id: self._open_chapter(cid, 0),
+            ))
+
     def closeEvent(self, e) -> None:  # noqa: N802
         try:
             self.kernel.shutdown()
@@ -455,19 +629,85 @@ class _TestPickerStub(QWidget):
         outer.addWidget(scroll)
 
 
+def _is_legacy() -> bool:
+    """Return True if the user opted into the old QSS shell."""
+    flag = os.environ.get("STUDYPY_LEGACY_UI", "").strip().lower()
+    return flag in ("1", "true", "yes", "on")
+
+
+class WebMainWindow(QMainWindow):
+    """Frameless host window that mounts a `WebShell` (HTML/CSS/JS UI)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setWindowTitle("Study Python for Finance")
+        self.setMinimumSize(1200, 780)
+        self.resize(1360, 860)
+
+        # .env best-effort
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(PROJECT_ROOT / ".env")
+        except ImportError:
+            pass
+
+        self.repo = Repository(DB_PATH)
+        self.user = self.repo.get_or_create_default_user()
+        self.kernel = KernelSession()
+        self.llm = ClaudeClient()
+
+        try:
+            self.chapters = load_chapters(CONTENT_DIR)
+        except ContentError as e:
+            QMessageBox.critical(self, "章ファイルの読み込みに失敗しました", str(e))
+            self.chapters = []
+        try:
+            self.test_sets = load_test_sets(TESTS_DIR)
+        except Exception as e:  # noqa: BLE001
+            logging.exception("test set load failed")
+            self.test_sets = {}
+
+        # Lazy import so legacy-only environments aren't forced to install
+        # pyqt6-webengine.
+        from .ui.web_shell import WebShell
+
+        self.web = WebShell(
+            self.chapters, self.repo, self.user.id, self.kernel, self.test_sets,
+        )
+        self.setCentralWidget(self.web)
+
+        # Start kernel; relay state to the web layer.
+        try:
+            self.kernel.start()
+            self.web.notify_kernel_state("ready")
+        except Exception as e:  # noqa: BLE001
+            logging.exception("kernel start failed")
+            self.web.notify_kernel_state("error")
+
+    def closeEvent(self, e) -> None:  # noqa: N802
+        try:
+            self.kernel.shutdown()
+        except Exception:  # noqa: BLE001
+            logging.exception("kernel shutdown failed")
+        super().closeEvent(e)
+
+
 def main() -> int:
     _configure_logging()
     QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
     app = QApplication(sys.argv)
-    # Load any bundled fonts (Inter / Geist / JetBrains Mono / Noto Sans JP)
-    # before the stylesheet is applied so QSS font-family lookups resolve.
     families = _load_bundled_fonts()
     if families:
         logging.info("bundled fonts active: %s", ", ".join(families))
-    app.setStyleSheet(GLOBAL_STYLESHEET)
-    win = MainWindow()
+
+    if _is_legacy():
+        # Legacy QSS shell
+        app.setStyleSheet(GLOBAL_STYLESHEET)
+        win = MainWindow()
+    else:
+        win = WebMainWindow()
     win.show()
     return app.exec()
 

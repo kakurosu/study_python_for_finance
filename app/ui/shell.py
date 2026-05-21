@@ -51,16 +51,22 @@ from ..resources.theme import (
     ACCENT_TINT,
     BG,
     FONT_MONO,
+    FONT_SANS,
     INK,
     INK_2,
     INK_3,
     INK_4,
     INK_5,
     LINE,
+    LINE_FOCUS,
+    LINE_STRONG,
+    LINE_SUBTLE,
     SUCCESS,
     SURFACE,
     SURFACE_ALT,
+    SURFACE_TINT,
 )
+from .widgets.kbd import KbdCombo
 
 
 # ---------------------------------------------------------------------------
@@ -137,16 +143,40 @@ class SidebarNav(QFrame):
         # --- nav items --------------------------------------------------
         nav_wrap = QWidget(self)
         nav_layout = QVBoxLayout(nav_wrap)
-        nav_layout.setContentsMargins(12, 18, 12, 18)
+        nav_layout.setContentsMargins(12, 14, 12, 14)
         nav_layout.setSpacing(2)
         self._nav_layout = nav_layout
         self._items: dict[str, _NavItem] = {}
         outer.addWidget(nav_wrap, 1)
 
-        # (Mini progress card removed — sidebar bottom is intentionally empty
-        # so the nav reads cleaner; progress lives on the dashboard.)
+        # --- Cmd+K palette hint pill (Arc/Raycast affordance) -----------
+        pill_wrap = QFrame(self)
+        pill_wrap.setFixedHeight(46)
+        pill_wrap.setStyleSheet(
+            f"QFrame {{ background: transparent;"
+            f" border-top: 1px solid {LINE_SUBTLE}; }}"
+        )
+        pill_l = QHBoxLayout(pill_wrap)
+        pill_l.setContentsMargins(14, 6, 14, 8)
+        pill_l.setSpacing(8)
+        self._palette_btn = QPushButton("  ⌕   検索…", pill_wrap)
+        self._palette_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._palette_btn.setStyleSheet(
+            f"QPushButton {{ background: transparent; color: {INK_3};"
+            f" border: 1px solid {LINE}; border-radius: 0;"
+            f" padding: 6px 8px; text-align: left;"
+            f" font-family: {FONT_SANS}; font-size: 11px; font-weight: 600;"
+            f" min-width: 0; min-height: 0; }}"
+            f"QPushButton:hover {{ color: {INK_2}; border-color: {LINE_FOCUS}; }}"
+        )
+        self._palette_btn.clicked.connect(self._on_palette_clicked)
+        pill_l.addWidget(self._palette_btn, 1)
+        kbd = KbdCombo(["Ctrl", "K"], pill_wrap, muted=True)
+        pill_l.addWidget(kbd, 0, Qt.AlignmentFlag.AlignVCenter)
+        outer.addWidget(pill_wrap)
 
         self._active_slug: str | None = None
+        self._palette_handler = None
 
     # ------------------------------------------------------------------
     def add_item(self, slug: str, label: str, *, icon: str = "·", group: str = "学習",
@@ -205,12 +235,12 @@ class SidebarNav(QFrame):
         if active:
             return (
                 f"QPushButton {{"
-                f" background: {ACCENT_TINT};"
+                f" background: {SURFACE_TINT};"
                 f" color: {INK};"
                 f" border: none;"
-                f" border-left: 2px solid {ACCENT};"
+                f" border-left: 1px solid {LINE_FOCUS};"
                 f" border-radius: 0;"
-                f" padding: 8px 14px 8px 16px;"
+                f" padding: 7px 14px 7px 17px;"
                 f" font-family: 'Inter Variable', 'Inter', sans-serif;"
                 f" font-size: 12.5px; font-weight: 700;"
                 f" text-align: left; min-width: 0; min-height: 0;"
@@ -222,21 +252,28 @@ class SidebarNav(QFrame):
             f" background: transparent;"
             f" color: {INK_2};"
             f" border: none;"
-            f" border-left: 2px solid transparent;"
+            f" border-left: 1px solid transparent;"
             f" border-radius: 0;"
-            f" padding: 8px 14px 8px 16px;"
+            f" padding: 7px 14px 7px 17px;"
             f" font-family: 'Inter Variable', 'Inter', sans-serif;"
             f" font-size: 12.5px; font-weight: 600;"
             f" text-align: left; min-width: 0; min-height: 0;"
             f" letter-spacing: -0.1px;"
             f" }}"
-            # Hover: text turns accent + left bar appears. No background fill.
-            f"QPushButton:hover {{ background: transparent; color: {ACCENT};"
-            f" border-left: 2px solid {ACCENT}; }}"
+            f"QPushButton:hover {{ background: {SURFACE_TINT};"
+            f" color: {INK};"
+            f" border-left: 1px solid {LINE_FOCUS}; }}"
         )
 
     def _on_clicked(self, slug: str) -> None:
         self.activated.emit(slug)
+
+    def _on_palette_clicked(self) -> None:
+        if self._palette_handler is not None:
+            self._palette_handler()
+
+    def set_palette_handler(self, fn) -> None:
+        self._palette_handler = fn
 
     # ------------------------------------------------------------------
     # Mini progress API kept as a no-op so existing callers (main.py) still
@@ -251,7 +288,7 @@ class SidebarNav(QFrame):
 
 
 class TopBar(QFrame):
-    """Window-wide top bar with breadcrumb on the left, search + avatar on the right."""
+    """Window-wide top bar with breadcrumb on the left, search + kernel pill on the right."""
 
     HEIGHT = 56
 
@@ -267,23 +304,78 @@ class TopBar(QFrame):
         )
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(28, 0, 24, 0)
+        layout.setContentsMargins(28, 0, 18, 0)
         layout.setSpacing(14)
 
-        # Breadcrumb area — multiple QLabels, separators are dim slashes
+        # Breadcrumb area — multiple QLabels, separators are dim chevrons
         self._crumb_holder = QWidget(self)
         self._crumb_layout = QHBoxLayout(self._crumb_holder)
         self._crumb_layout.setContentsMargins(0, 0, 0, 0)
         self._crumb_layout.setSpacing(8)
         layout.addWidget(self._crumb_holder, 1, Qt.AlignmentFlag.AlignVCenter)
 
-        # Right-side widgets intentionally minimal: just enough whitespace
-        # for the breadcrumb to breathe. The previous streak / avatar /
-        # ⌘K chips read as "fake account UI" so we strip them.
+        # Right: Raycast-style command search button + kernel pill
+        self._palette_btn = QPushButton("  ⌕   検索 / コマンド", self)
+        self._palette_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._palette_btn.setStyleSheet(
+            f"QPushButton {{ background: transparent; color: {INK_3};"
+            f" border: 1px solid {LINE}; border-radius: 0;"
+            f" padding: 6px 10px; text-align: left;"
+            f" font-family: {FONT_SANS}; font-size: 11px; font-weight: 600;"
+            f" min-width: 200px; min-height: 26px; }}"
+            f"QPushButton:hover {{ color: {INK_2}; border-color: {LINE_FOCUS}; }}"
+        )
+        self._palette_btn.clicked.connect(self._on_palette_clicked)
+        layout.addWidget(self._palette_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        kbd = KbdCombo(["Ctrl", "K"], self, muted=True)
+        layout.addWidget(kbd, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        # Kernel state pill (mirrors status bar; visible at-a-glance)
+        self._kernel_pill = QFrame(self)
+        self._kernel_pill.setFixedHeight(26)
+        self._kernel_pill.setStyleSheet(
+            f"QFrame {{ background: transparent;"
+            f" border: 1px solid {LINE}; border-radius: 0; }}"
+        )
+        kp_l = QHBoxLayout(self._kernel_pill)
+        kp_l.setContentsMargins(8, 0, 10, 0)
+        kp_l.setSpacing(6)
+        self._kernel_dot = QFrame(self._kernel_pill)
+        self._kernel_dot.setFixedSize(6, 6)
+        self._kernel_dot.setStyleSheet(f"background: {SUCCESS}; border: none;")
+        kp_l.addWidget(self._kernel_dot, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._kernel_lbl = QLabel("ready", self._kernel_pill)
+        self._kernel_lbl.setStyleSheet(
+            f"color: {INK_3}; font-size: 10px; font-weight: 700;"
+            f" font-family: {FONT_MONO}; letter-spacing: 0.3px;"
+        )
+        kp_l.addWidget(self._kernel_lbl, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self._kernel_pill, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self._palette_handler = None
 
         # Default breadcrumb — the brand is already in the sidebar, so the
         # crumb starts with the section name only.
         self.set_breadcrumb("Dashboard")
+
+    def _on_palette_clicked(self) -> None:
+        if self._palette_handler is not None:
+            self._palette_handler()
+
+    def set_palette_handler(self, fn) -> None:
+        self._palette_handler = fn
+
+    def set_kernel_state(self, state: str) -> None:
+        colors = {
+            "ready": SUCCESS,
+            "busy":  "#F59E0B",
+            "error": ACCENT,
+            "idle":  INK_4,
+        }
+        c = colors.get(state, INK_4)
+        self._kernel_dot.setStyleSheet(f"background: {c}; border: none;")
+        self._kernel_lbl.setText(state)
 
     # ------------------------------------------------------------------
     def set_breadcrumb(self, *parts: str) -> None:
@@ -307,8 +399,10 @@ class TopBar(QFrame):
                 )
             self._crumb_layout.addWidget(lbl, 0, Qt.AlignmentFlag.AlignVCenter)
             if i < last_idx:
-                sep = QLabel("/", self._crumb_holder)
-                sep.setStyleSheet(f"color: {INK_4}; font-size: 12px;")
+                sep = QLabel("›", self._crumb_holder)
+                sep.setStyleSheet(
+                    f"color: {INK_5}; font-size: 13px; font-weight: 600;"
+                )
                 self._crumb_layout.addWidget(sep, 0, Qt.AlignmentFlag.AlignVCenter)
         self._crumb_layout.addStretch(1)
 

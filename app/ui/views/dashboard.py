@@ -48,12 +48,16 @@ from ...resources.theme import (
     INK_4,
     INK_5,
     LINE,
+    LINE_FOCUS,
+    LINE_SUBTLE,
     PHASE_LABELS,
     SUCCESS,
     SURFACE,
     SURFACE_ALT,
+    SURFACE_TINT,
 )
 from ..code_view import CodeBlock
+from ..widgets.kbd import KbdCombo
 
 
 # Phase metadata (display labels + description used in dashboard cards)
@@ -107,7 +111,16 @@ class _Section(QFrame):
 
 
 class _PhaseProgressRow(QFrame):
-    """A row inside the 'フェーズ別の進捗' card."""
+    """A row inside the 'フェーズ別の進捗' card.
+
+    Raycast-style: a discrete segmented bar where each chapter is a small
+    block (filled = completed, dim = remaining). Reads as "progress through
+    a precise count of items" rather than a smooth percentage.
+    """
+
+    SEGMENT_WIDTH = 9
+    SEGMENT_HEIGHT = 8
+    SEGMENT_GAP = 3
 
     def __init__(
         self,
@@ -127,46 +140,54 @@ class _PhaseProgressRow(QFrame):
         # Phase badge
         badge = QLabel(phase, self)
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        badge.setFixedSize(26, 26)
+        badge.setFixedSize(24, 24)
         badge.setStyleSheet(
             f"background: transparent; color: {INK}; border: 1px solid {LINE};"
-            f" font-size: 14px; font-weight: 800;"
+            f" font-size: 13px; font-weight: 800;"
         )
         layout.addWidget(badge, 0, Qt.AlignmentFlag.AlignVCenter)
 
         # Title + subtitle column
         col = QVBoxLayout()
-        col.setSpacing(0)
+        col.setSpacing(2)
         t = QLabel(title, self)
         t.setStyleSheet(
             f"color: {INK}; font-size: 12.5px; font-weight: 700; letter-spacing: -0.1px;"
         )
         col.addWidget(t)
-        sub = QLabel(f"{completed}/{total} 章", self)
+        sub = QLabel(f"{completed} / {total} 章", self)
         sub.setStyleSheet(
-            f"color: {INK_4}; font-size: 12px;"
-            f" letter-spacing: 0.3px;"
+            f"color: {INK_4}; font-size: 11px; font-weight: 600;"
+            f" letter-spacing: 0.2px;"
         )
         col.addWidget(sub)
         layout.addLayout(col, 1)
 
-        # Progress track + fill
-        track = QFrame(self)
-        track.setFixedSize(160, 4)
-        track.setStyleSheet(f"background: {LINE}; border: none;")
-        layout.addWidget(track, 0, Qt.AlignmentFlag.AlignVCenter)
-        pct = 0 if total == 0 else int(completed / total * 100)
-        fill = QFrame(track)
-        fill.setStyleSheet(f"background: {ACCENT}; border: none;")
-        fill.setGeometry(0, 0, int(160 * pct / 100), 4)
+        # Segmented progress bar
+        seg_wrap = QFrame(self)
+        seg_wrap.setStyleSheet("background: transparent; border: none;")
+        seg_l = QHBoxLayout(seg_wrap)
+        seg_l.setContentsMargins(0, 0, 0, 0)
+        seg_l.setSpacing(self.SEGMENT_GAP)
+        for i in range(max(total, 1)):
+            seg = QFrame(seg_wrap)
+            seg.setFixedSize(self.SEGMENT_WIDTH, self.SEGMENT_HEIGHT)
+            if i < completed:
+                color = ACCENT
+            else:
+                color = LINE
+            seg.setStyleSheet(f"background: {color}; border: none;")
+            seg_l.addWidget(seg)
+        layout.addWidget(seg_wrap, 0, Qt.AlignmentFlag.AlignVCenter)
 
         # Percent label
+        pct = 0 if total == 0 else int(completed / total * 100)
         v = QLabel(f"{pct}%", self)
         v.setStyleSheet(
-            f"color: {INK_2}; font-size: 14px; font-weight: 700;"
-            f" letter-spacing: 0;"
+            f"color: {INK_2}; font-size: 13px; font-weight: 700;"
+            f" letter-spacing: 0; font-family: {FONT_SANS_DISPLAY};"
         )
-        v.setFixedWidth(42)
+        v.setFixedWidth(40)
         v.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(v, 0, Qt.AlignmentFlag.AlignVCenter)
 
@@ -227,43 +248,45 @@ class _ContinueCard(QFrame):
         super().__init__(parent)
         self.setObjectName("ContinueCardV2")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Arc-style pinned card: red left accent + ultra-subtle outline.
+        # Hover thickens the left accent rather than wrapping the full box
+        # in red — quieter and more directional.
         self.setStyleSheet(
             f"""
-            #ContinueCardV2 {{ background: transparent; border: 1px solid {LINE};
+            #ContinueCardV2 {{ background: {SURFACE};
+                border: 1px solid {LINE_SUBTLE};
+                border-left: 2px solid {ACCENT};
                 border-radius: 0; }}
-            #ContinueCardV2:hover {{ border-color: {ACCENT}; }}
+            #ContinueCardV2:hover {{ background: {SURFACE_TINT};
+                border-left: 4px solid {ACCENT};
+                border-color: {LINE}; }}
             """
         )
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(28, 24, 28, 24)
+        layout.setContentsMargins(28, 22, 28, 22)
         layout.setSpacing(28)
 
-        # Left column — kicker + title + meta + buttons
+        # Left column — tag row + title + meta + buttons
         left = QVBoxLayout()
         left.setSpacing(0)
 
-        # ● 続きから · PHASE A · CH 07
+        # Arc-style tag row: [Pinned] [Phase A] [Ch 07]
+        tag_row = QHBoxLayout()
+        tag_row.setContentsMargins(0, 0, 0, 0)
+        tag_row.setSpacing(6)
+        pinned_tag = QLabel("PINNED", self)
+        pinned_tag.setProperty("tag", "accent")
+        tag_row.addWidget(pinned_tag, 0, Qt.AlignmentFlag.AlignVCenter)
         if chapter is not None:
-            kicker_text = (
-                f"<span style='color:{ACCENT}'>●</span> "
-                f"<span style='color:{ACCENT}; font-weight:800;'>続きから</span>"
-                f" <span style='color:{INK_4}'>·</span>"
-                f" <span style='color:{INK_3}'>{PHASE_LABELS[chapter.phase]}</span>"
-                f" <span style='color:{INK_4}'>·</span>"
-                f" <span style='color:{INK_3}'>Ch {chapter.id:02d}</span>"
-            )
-        else:
-            kicker_text = (
-                f"<span style='color:{ACCENT}'>●</span> "
-                f"<span style='color:{ACCENT}; font-weight:800;'>はじめての学習</span>"
-            )
-        kicker = QLabel(kicker_text, self)
-        kicker.setTextFormat(Qt.TextFormat.RichText)
-        kicker.setStyleSheet(
-            f"font-size: 13px; letter-spacing: 0.4px;"
-        )
-        left.addWidget(kicker)
-        left.addSpacing(10)
+            phase_tag = QLabel(PHASE_LABELS[chapter.phase], self)
+            phase_tag.setProperty("tag", True)
+            tag_row.addWidget(phase_tag, 0, Qt.AlignmentFlag.AlignVCenter)
+            ch_tag = QLabel(f"Ch {chapter.id:02d}", self)
+            ch_tag.setProperty("tag", True)
+            tag_row.addWidget(ch_tag, 0, Qt.AlignmentFlag.AlignVCenter)
+        tag_row.addStretch(1)
+        left.addLayout(tag_row)
+        left.addSpacing(14)
 
         title = QLabel(
             chapter.title if chapter is not None else "Begin Your Journey",
@@ -287,28 +310,31 @@ class _ContinueCard(QFrame):
         left.addWidget(sub)
         left.addStretch(1)
 
-        # CTA row
+        # CTA row — Resume button + Kbd hint + page meta on the right
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(14)
-        resume = QPushButton("▷  再開する", self)
+        btn_row.setSpacing(10)
+        resume = QPushButton("再開する", self)
         resume.setCursor(Qt.CursorShape.PointingHandCursor)
         resume.setStyleSheet(
             f"QPushButton {{ background: {ACCENT}; color: white;"
             f" border: 1px solid {ACCENT}; border-radius: 0;"
-            f" padding: 9px 22px; font-size: 14px; font-weight: 700;"
+            f" padding: 9px 22px; font-size: 13px; font-weight: 700;"
             f" min-width: 0; min-height: 0; }}"
             f"QPushButton:hover {{ background: #F87171; border-color: #F87171; }}"
         )
         resume.clicked.connect(self.clicked.emit)
         btn_row.addWidget(resume)
+        resume_kbd = KbdCombo(["↵"], self, muted=True)
+        btn_row.addWidget(resume_kbd, 0, Qt.AlignmentFlag.AlignVCenter)
+        btn_row.addSpacing(6)
 
         if chapter is not None:
             page_meta = QLabel(
-                f"ページ {last_page_idx + 1}/{len(chapter.pages)}", self
+                f"ページ {last_page_idx + 1} / {len(chapter.pages)}", self
             )
             page_meta.setStyleSheet(
-                f"color: {INK_4}; font-size: 13px; font-weight: 700;"
-                f" letter-spacing: 0;"
+                f"color: {INK_4}; font-size: 12px; font-weight: 700;"
+                f" letter-spacing: 0.2px;"
             )
             btn_row.addWidget(page_meta)
         btn_row.addStretch(1)
@@ -480,15 +506,17 @@ class DashboardView(QWidget):
 
         # クイックアクション
         qa = _Section("クイックアクション", inner)
-        for slug, icon, title, desc in [
+        for slug, icon, title, desc, kbd in [
             ("chapters",  "□", "章を選ぶ",
-             "Phase A〜F の好きな章へ移動"),
+             "Phase A〜F の好きな章へ移動", ["Ctrl", "2"]),
             ("tests",     "✓", "実力テスト",
-             "Phase ごとに 10 問で習熟度を測る"),
+             "Phase ごとに 10 問で習熟度を測る", ["Ctrl", "4"]),
             ("history",   "≡", "学習履歴",
-             "過去のスコアと推移を見る"),
+             "過去のスコアと推移を見る", ["Ctrl", "5"]),
         ]:
-            qa.add_widget(_QuickActionRow(slug, icon, title, desc, on_click=self._route))
+            qa.add_widget(_QuickActionRow(
+                slug, icon, title, desc, on_click=self._route, kbd_keys=kbd,
+            ))
         rail.addWidget(qa)
         rail.addStretch(1)
         cols.addLayout(rail, 2)
@@ -509,7 +537,7 @@ class DashboardView(QWidget):
 
 
 class _QuickActionRow(QFrame):
-    """A row in the クイックアクション card (icon + title + subtitle + arrow)."""
+    """A row in the クイックアクション card (icon + title + subtitle + Kbd)."""
 
     def __init__(
         self,
@@ -518,30 +546,33 @@ class _QuickActionRow(QFrame):
         title: str,
         subtitle: str,
         on_click,
+        kbd_keys: list[str] | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("QuickActionRow")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        # No background fill on hover (the rectangular highlight was
-        # distracting). Instead the title and arrow turn accent red.
+        # Raycast-style row: tinted hover background + accent left border on
+        # hover (subtle directional cue). No bottom divider — each row is
+        # demarcated by hover instead of by a static line.
         self.setStyleSheet(
             f"""
             #QuickActionRow {{ background: transparent;
-                border: none; border-bottom: 1px solid {LINE}; }}
-            #QuickActionRow:hover #qaTitle {{ color: {ACCENT}; }}
-            #QuickActionRow:hover #qaArrow {{ color: {ACCENT}; }}
+                border: none;
+                border-left: 2px solid transparent;
+                border-bottom: 1px solid {LINE_SUBTLE}; }}
+            #QuickActionRow:hover {{ background: {SURFACE_TINT};
+                border-left: 2px solid {ACCENT}; }}
+            #QuickActionRow:hover #qaTitle {{ color: {INK}; }}
             """
         )
         self._slug = slug
         self._on_click = on_click
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(2, 10, 2, 10)
+        layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(14)
 
-        # Plain text glyph (no bordered square — the bordered square added a
-        # visible rectangle that conflicted with the flat row aesthetic).
         ic = QLabel(icon, self)
         ic.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ic.setFixedWidth(20)
@@ -556,18 +587,17 @@ class _QuickActionRow(QFrame):
         t = QLabel(title, self)
         t.setObjectName("qaTitle")
         t.setStyleSheet(
-            f"color: {INK}; font-size: 15px; font-weight: 700; letter-spacing: -0.1px;"
+            f"color: {INK}; font-size: 14px; font-weight: 700; letter-spacing: -0.1px;"
         )
         col.addWidget(t)
         s = QLabel(subtitle, self)
-        s.setStyleSheet(f"color: {INK_4}; font-size: 13px;")
+        s.setStyleSheet(f"color: {INK_4}; font-size: 12px;")
         col.addWidget(s)
         layout.addLayout(col, 1)
 
-        arrow = QLabel("→", self)
-        arrow.setObjectName("qaArrow")
-        arrow.setStyleSheet(f"color: {INK_4}; font-size: 16px; font-weight: 400;")
-        layout.addWidget(arrow, 0, Qt.AlignmentFlag.AlignVCenter)
+        if kbd_keys:
+            kbd = KbdCombo(kbd_keys, self, muted=True)
+            layout.addWidget(kbd, 0, Qt.AlignmentFlag.AlignVCenter)
 
     def mousePressEvent(self, e) -> None:  # noqa: N802
         if e.button() == Qt.MouseButton.LeftButton:

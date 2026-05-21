@@ -40,6 +40,7 @@ dependencies = [
     # Chapter 25 launches Streamlit live — moved from optional to core so
     # `uv sync` alone gives a working chapter 25 demo.
     "streamlit>=1.32",
+    "pyqt6-webengine>=6.11.0",
 ]
 
 [project.optional-dependencies]

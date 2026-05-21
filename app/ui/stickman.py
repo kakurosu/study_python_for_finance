@@ -33,6 +33,7 @@ from ..resources.theme import (
     INK,
     INK_3,
     LINE,
+    LINE_SUBTLE,
     SURFACE_ALT,
 )
 
@@ -116,8 +117,8 @@ class StickmanStrip(QFrame):
             f"""
             #SpeechBubble {{
                 background: {SURFACE_ALT};
-                border: 1px solid {LINE};
-                border-left: 3px solid {ACCENT};
+                border: 1px solid {LINE_SUBTLE};
+                border-left: 2px solid {ACCENT};
             }}
             """
         )
