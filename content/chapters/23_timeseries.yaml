@@ -12,8 +12,14 @@ pages:
     title: "AR(1) モデル"
     markdown: |
       ## 自己回帰モデル
-      `y_t = φ · y_{t-1} + ε_t` の形のモデル。
-      φ が 1 に近いほど、過去の値を強く引きずる（ランダムウォークに近い）。
+
+      $$ y_t = \phi\, y_{t-1} + \varepsilon_t,\quad \varepsilon_t \sim \mathcal{N}(0,\sigma^2) $$
+
+      - $\phi$ (ファイ) は **過去の値をどれだけ引きずるか** を決める係数 ($|\phi| < 1$ で定常)
+      - $\phi$ が **1 に近いほど** 過去の値を強く引きずる (ランダムウォークに近づく)
+      - $\phi$ が **0 に近いほど** 過去とは独立 (ホワイトノイズに近づく)
+      - $\varepsilon_t$ はホワイトノイズ (平均 0 の独立な誤差項)
+
       statsmodels で簡単に推定できます。
     sample_code: |
       import numpy as np
@@ -50,8 +56,11 @@ pages:
   - kind: exercise
     title: "AR(1) 系列を生成しよう"
     prompt: |
-      `arma_generate_sample` を使って **φ=0.5** の AR(1) サンプルを 200 個生成してください。
-      AR 多項式 `[1, -φ]` の指定がポイントです。
+      `arma_generate_sample` を使って **$\phi = 0.5$** の AR(1) サンプルを 200 個生成してください。
+
+      **注意**: statsmodels では AR 多項式を **`[1, -φ]`** の符号反転形式で指定します。
+      これは AR モデルを「ラグ多項式」$1 - \phi L = 0$ の係数列として表現する慣習に由来します。
+      $\phi = 0.5$ なら **`[1, -0.5]`** を渡します。
     code_template: |
       import numpy as np
       from statsmodels.tsa.arima_process import arma_generate_sample

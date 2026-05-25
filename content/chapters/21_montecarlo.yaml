@@ -11,14 +11,15 @@ pages:
   - kind: sample
     title: "Geometric Brownian Motion"
     markdown: |
-      ## GBM
+      ## GBM (Geometric Brownian Motion)
+
       株価の代表的なモデル:
 
-      ```
-      S_T = S_0 · exp((μ − σ²/2) · T + σ · √T · Z)    # Z ~ N(0,1)
-      ```
+      $$ S_T = S_0 \exp\!\Bigl( \bigl(\mu - \tfrac{\sigma^2}{2}\bigr) T + \sigma \sqrt{T}\, Z \Bigr),\quad Z \sim \mathcal{N}(0, 1) $$
 
-      たくさんの Z をサンプリング → S_T の分布が得られる → ペイオフを平均 → 割引でオプション価格。
+      - $\mu$: 期待リターン (年率)、$\sigma$: ボラティリティ (年率)
+      - **ドリフト補正項 $-\sigma^2/2$** は伊藤の補題から来る (これを忘れると価格期待値がズレる)
+      - たくさんの $Z$ をサンプリング → $S_T$ の分布 → ペイオフを平均 → 割引でオプション価格
     sample_code: |
       import numpy as np
       np.random.seed(42)
@@ -48,8 +49,11 @@ pages:
   - kind: sample
     title: "ヨーロピアンコールオプションの MC 評価"
     markdown: |
-      ## コール価格 = e^(-rT) · E[max(S_T − K, 0)]
-      満期で行使される額の期待値を割り引いたもの。
+      ## ヨーロピアンコール価格の MC 評価
+
+      $$ C = e^{-rT} \cdot \mathbb{E}\bigl[\max(S_T - K, 0)\bigr] $$
+
+      満期 $T$ で行使される額 $\max(S_T - K, 0)$ の期待値を **無リスク利率 $r$ で割り引いた** ものがコール価格。
       Black-Scholes の解析解と十分近くなれば実装は OK。
     sample_code: |
       import numpy as np

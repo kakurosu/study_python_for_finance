@@ -12,14 +12,18 @@ pages:
     title: "期待値・分散・標準偏差"
     markdown: |
       ## 統計の基本指標
+
       | 指標 | 意味 | NumPy |
       |------|------|-------|
-      | E[r] | リターンの平均（期待値） | `r.mean()` |
-      | Var[r] | リターンのばらつき | `r.var(ddof=1)` |
-      | σ | ばらつきの平方根（標準偏差） | `r.std(ddof=1)` |
+      | $\mathbb{E}[r]$ | リターンの平均（期待値）  | `r.mean()` |
+      | $\mathrm{Var}[r]$ | リターンのばらつき | `r.var(ddof=1)` |
+      | $\sigma$ | ばらつきの平方根（標準偏差） | `r.std(ddof=1)` |
 
-      **年率換算**: 期待値は **× 252**、ボラ（σ）は **× √252**。
-      これは独立同分布を仮定したときの「ルートT 則」と呼ばれます。
+      **年率換算**: 期待値は $\times 252$、ボラ ($\sigma$) は $\times \sqrt{252}$。
+
+      $$ \mu_{\text{annual}} = \mu_{\text{daily}} \times 252,\quad \sigma_{\text{annual}} = \sigma_{\text{daily}} \times \sqrt{252} $$
+
+      これは独立同分布を仮定したときの **「ルート T 則」** と呼ばれます (分散は線形加算、標準偏差は √)。
     sample_code: |
       import numpy as np
       r = np.array([0.001, -0.002, 0.003, -0.001, 0.002, 0.0, 0.001])

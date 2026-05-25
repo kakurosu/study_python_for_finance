@@ -11,8 +11,12 @@ pages:
   - kind: sample
     title: "シャープレシオ — リスク調整リターン"
     markdown: |
-      ## SR = (期待リターン − リスクフリー) ÷ ボラティリティ
-      「**取ったリスク 1 単位** あたりに、無リスク資産より **どれだけ稼いだか**」を測る指標。
+      ## Sharpe Ratio = リスク 1 単位あたりの超過リターン
+
+      $$ \text{SR} = \dfrac{\mathbb{E}[r_p] - r_f}{\sigma_p} = \dfrac{\mu_p - r_f}{\sigma_p} $$
+
+      「**取ったリスク 1 単位 ($\sigma_p$) あたりに、無リスク資産 $r_f$ より どれだけ稼いだか**」を測る指標。
+      William Sharpe (1990 ノーベル経済学賞) が提案。
       高いほど効率の良い運用。一般的に SR > 1 は優秀、> 2 は卓越。
     sample_code: |
       def sharpe_ratio(mu, vol, rf=0.0):
@@ -28,8 +32,11 @@ pages:
   - kind: sample
     title: "情報比率 (IR)"
     markdown: |
-      ## IR = α ÷ TE
-      ベンチマーク **対比** の評価指標です。
+      ## Information Ratio = アクティブリターン ÷ トラッキングエラー
+
+      $$ \text{IR} = \dfrac{\mu_p - \mu_b}{\sigma(r_p - r_b)} = \dfrac{\alpha}{\text{TE}} $$
+
+      ベンチマーク **対比** の評価指標です。$\alpha$ はベンチを超過した平均リターン、$\text{TE}$ はその差分系列の標準偏差。
       - **α (アルファ)**: ベンチマーク超過の期待リターン (= 平均アクティブリターン)
       - **TE**: アクティブリターンのボラ（前章）
 

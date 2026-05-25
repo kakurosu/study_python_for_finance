@@ -11,14 +11,17 @@ pages:
   - kind: sample
     title: "ポートフォリオの分散"
     markdown: |
-      ## 2 銘柄ポートフォリオ
-      重み `w1, w2` (合計 1) のポートフォリオの分散は:
+      ## 2 銘柄ポートフォリオの分散
 
-      ```
-      Var(p) = w1² σ1² + w2² σ2² + 2 w1 w2 ρ σ1 σ2
-      ```
+      重み $w_1, w_2$ (合計 1) のポートフォリオ分散は:
 
-      行列形式で書くと `Var(p) = wᵀ Σ w`（Σ は共分散行列）。
+      $$ \mathrm{Var}(p) = w_1^2 \sigma_1^2 + w_2^2 \sigma_2^2 + 2 w_1 w_2 \rho \sigma_1 \sigma_2 $$
+
+      行列形式で書くと $n$ 銘柄に一般化できます:
+
+      $$ \mathrm{Var}(p) = \mathbf{w}^\top \Sigma\, \mathbf{w} \quad (\Sigma\ \text{は共分散行列}) $$
+
+      第 3 項の $2 w_1 w_2 \rho \sigma_1 \sigma_2$ がポートフォリオ理論の **「分散効果」** の源泉 — $\rho < 1$ ならリスクが減ります。
     sample_code: |
       import numpy as np
       sigma = np.array([0.20, 0.12])
