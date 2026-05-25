@@ -66,8 +66,11 @@ pages:
   - kind: exercise
     title: "ポートフォリオ分散を計算しよう"
     prompt: |
-      共分散行列 `cov` と重みベクトル `w` から `Var(p) = wᵀ Σ w` を計算してください。
-      `@` 演算子で行列積を取れます。
+      共分散行列 $\Sigma$ (`cov`) と重みベクトル $\mathbf{w}$ (`w`) から、ポートフォリオ分散を計算してください:
+
+      $$ \mathrm{Var}(p) = \mathbf{w}^\top \Sigma\, \mathbf{w} $$
+
+      Python では `@` 演算子で行列積を取れます。`w @ cov @ w` は左から順に「ベクトル × 行列」「ベクトル × ベクトル」と計算され、結果はスカラーになります。
     code_template: |
       import numpy as np
       cov = np.array([[0.04, 0.0072], [0.0072, 0.0144]])

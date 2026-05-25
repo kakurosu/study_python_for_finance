@@ -36,12 +36,11 @@ pages:
   - kind: exercise
     title: "期待値を年率に換算しよう"
     prompt: |
-      **期待値（E[r]）** は確率論で「平均的にどんな値が出るか」を表す統計量。日次リターン系列なら `r.mean()` が標本期待値（標本平均）です。
+      **期待値 $\mathbb{E}[r]$** は確率論で「平均的にどんな値が出るか」を表す統計量。日次リターン系列なら `r.mean()` が標本期待値（標本平均）です。
 
       日次→年率の換算ルール:
-      - **期待値**: × 252（営業日数倍）
-      - **分散**: × 252
-      - **ボラティリティ（σ）**: × √252
+
+      $$ \mu_{\text{ann}} = \mu_{\text{daily}} \times 252,\quad \mathrm{Var}_{\text{ann}} = \mathrm{Var}_{\text{daily}} \times 252,\quad \sigma_{\text{ann}} = \sigma_{\text{daily}} \times \sqrt{252} $$
 
       これは「**独立同分布（i.i.d.）の和の分散は分散の和になる**」という確率論の基本性質から来ています。CMA 試験の記述問題でも問われる重要事項。
     code_template: |
