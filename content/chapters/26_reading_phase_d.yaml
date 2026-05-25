@@ -9,7 +9,7 @@ learning_goals:
 - statsmodels の時系列、scikit-learn の機械学習、PyTorch の DL コードを読み解ける
 pages:
 - kind: reading
-  title: ARIMA モデルの構築（章 20 復習）
+  title: ARIMA モデルの構築（章 23 復習）
   prompt: |
     下のコードが構築しているのはどんなモデルですか？
   code: |
@@ -26,10 +26,10 @@ pages:
   explanation: |-
     `order=(p, d, q)` はそれぞれ AR 次数 / 階差数 / MA 次数。`(1, 1, 1)` は 1 階差分を取った系列に AR(1) と MA(1) を当てはめる **ARIMA(1,1,1)** モデルです。
 
-    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる（リーケージ）、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
-    **詳しくは**: 章 23〜25 (Phase D) の参考実装 sample で標準フローが確認できます。
+    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる (リーケージ)、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
+    **詳しくは**: 章 23 を再確認してください。
 - kind: reading
-  title: リターン系列の生成（章 20 復習）
+  title: リターン系列の生成（章 23 復習）
   prompt: |
     下のコードが計算しているのは何ですか？
   code: |
@@ -47,10 +47,10 @@ pages:
   explanation: |-
     `pct_change()` は前期からの **変化率** `(P_t / P_{t-1}) - 1`。`102/100-1 = 0.02`、`101/102-1 ≈ -0.0098`、`105/101-1 ≈ 0.0396`。`dropna()` で先頭の NaN を除去します。
 
-    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる（リーケージ）、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
-    **詳しくは**: 章 23〜25 (Phase D) の参考実装 sample で標準フローが確認できます。
+    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる (リーケージ)、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
+    **詳しくは**: 章 23 を再確認してください。
 - kind: reading
-  title: 線形回帰の学習（章 21 復習）
+  title: 線形回帰の学習（章 24 復習）
   prompt: |
     下のコードを読んで、`coef_` が表すものとして正しいものを選んでください。
   code: |
@@ -68,10 +68,10 @@ pages:
   explanation: |-
     `LinearRegression.coef_` は各説明変数に対する **傾き（係数）** を返します。切片は `intercept_`、R² は `score(X, y)` で取得します。
 
-    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる（リーケージ）、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
-    **詳しくは**: 章 23〜25 (Phase D) の参考実装 sample で標準フローが確認できます。
+    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる (リーケージ)、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
+    **詳しくは**: 章 24 を再確認してください。
 - kind: reading
-  title: データ分割（章 21 復習）
+  title: データ分割（章 24 復習）
   prompt: |
     下のコードについて、`X_test` の役割として正しいものを選んでください。
   code: |
@@ -89,10 +89,10 @@ pages:
   explanation: |-
     `test_size=0.2` で全体の 20% がテストセットに切り分けられます。これは学習時には使わず、未知データでの予測性能（汎化性能）を測るために使います。
 
-    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる（リーケージ）、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
-    **詳しくは**: 章 23〜25 (Phase D) の参考実装 sample で標準フローが確認できます。
+    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる (リーケージ)、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
+    **詳しくは**: 章 24 を再確認してください。
 - kind: reading
-  title: 学習ステップの流れ（章 22 復習）
+  title: 学習ステップの流れ（章 25 復習）
   prompt: |
     下のコードについて、`optimizer.step()` が行うこととして正しいものを選んでください。
   code: |
@@ -112,10 +112,10 @@ pages:
   explanation: |-
     `loss.backward()` で勾配を計算し、`optimizer.step()` がその勾配に学習率を掛けてパラメータを更新します。`zero_grad()` は前回の勾配のリセットです。
 
-    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる（リーケージ）、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
-    **詳しくは**: 章 23〜25 (Phase D) の参考実装 sample で標準フローが確認できます。
+    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる (リーケージ)、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
+    **詳しくは**: 章 25 を再確認してください。
 - kind: reading
-  title: ニューラルネットの構造（章 22 復習）
+  title: ニューラルネットの構造（章 25 復習）
   prompt: |
     下のコードが定義するモデルとして正しいものを選んでください。
   code: |
@@ -135,5 +135,5 @@ pages:
   explanation: |-
     入力 10 → 全結合 32 → ReLU → 全結合 1。中間層が 1 つの **1 層 MLP（多層パーセプトロン）** です。回帰タスクで広く使われる構造です。
 
-    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる（リーケージ）、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
-    **詳しくは**: 章 23〜25 (Phase D) の参考実装 sample で標準フローが確認できます。
+    **ありがちな誤り**: train データで前処理 fit→test を transform するのを忘れる (リーケージ)、PyTorch で `model.eval()` 忘れ、ARIMA の `order` を順不同で指定する等。
+    **詳しくは**: 章 25 を再確認してください。

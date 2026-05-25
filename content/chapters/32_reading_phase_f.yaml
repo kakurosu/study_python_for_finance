@@ -8,7 +8,7 @@ learning_goals:
 - Streamlit と PyAutoGUI / Playwright のコードを読み解ける
 pages:
 - kind: reading
-  title: Streamlit でテキスト表示（章 25 復習）
+  title: Streamlit でテキスト表示（章 30 復習）
   prompt: |
     下のコードが画面に表示するものとして正しいものを選んでください。
   code: |
@@ -25,10 +25,10 @@ pages:
   explanation: |-
     Streamlit は **Python スクリプトを Web アプリ化** するライブラリ。`streamlit run app.py` でブラウザ上に UI が描画され、`st.title`／`st.write` がそれぞれタイトルと本文として表示されます。
 
-    **ありがちな誤り**: Streamlit の再実行モデルを意識せず重い処理を毎回走らせる、自動化で `pyautogui.FAILSAFE` を切ってしまう、Playwright で `headless=True` を忘れる等。
-    **詳しくは**: 章 30〜31 (Phase F) で実装パターンと安全装置を扱っています。
+    **ありがちな誤り**: Streamlit の再実行モデルを意識せず重い処理を毎回走らせる、自動化で `FAILSAFE` を切ってしまう、Playwright で `headless=True` を忘れる等。
+    **詳しくは**: 章 30 を再確認してください。
 - kind: reading
-  title: Streamlit のスライダー（章 25 復習）
+  title: Streamlit のスライダー（章 30 復習）
   prompt: |
     下のコードについて、`risk_free` の型として正しいものを選んでください。
   code: |
@@ -44,10 +44,10 @@ pages:
   explanation: |-
     `st.slider` は **ユーザーが現在選択している値そのもの** を返します。範囲を float で指定したので戻り値も float。`0.0 〜 5.0` の範囲、初期値 1.0、刻み 0.1 のスライダーです。
 
-    **ありがちな誤り**: Streamlit の再実行モデルを意識せず重い処理を毎回走らせる、自動化で `pyautogui.FAILSAFE` を切ってしまう、Playwright で `headless=True` を忘れる等。
-    **詳しくは**: 章 30〜31 (Phase F) で実装パターンと安全装置を扱っています。
+    **ありがちな誤り**: Streamlit の再実行モデルを意識せず重い処理を毎回走らせる、自動化で `FAILSAFE` を切ってしまう、Playwright で `headless=True` を忘れる等。
+    **詳しくは**: 章 30 を再確認してください。
 - kind: reading
-  title: マウス操作の自動化（章 26 復習）
+  title: マウス操作の自動化（章 31 復習）
   prompt: |
     下のコードが行うこととして正しいものを選んでください。
   code: |
@@ -64,10 +64,10 @@ pages:
   explanation: |-
     `moveTo(x, y, duration)` はマウスカーソルを指定座標へ動かす（`duration` で滑らかに）、`click()` は現在位置でクリック。GUI 操作の自動化に使います。
 
-    **ありがちな誤り**: Streamlit の再実行モデルを意識せず重い処理を毎回走らせる、自動化で `pyautogui.FAILSAFE` を切ってしまう、Playwright で `headless=True` を忘れる等。
-    **詳しくは**: 章 30〜31 (Phase F) で実装パターンと安全装置を扱っています。
+    **ありがちな誤り**: Streamlit の再実行モデルを意識せず重い処理を毎回走らせる、自動化で `FAILSAFE` を切ってしまう、Playwright で `headless=True` を忘れる等。
+    **詳しくは**: 章 31 を再確認してください。
 - kind: reading
-  title: Playwright でページ取得（章 26 復習）
+  title: Playwright でページ取得（章 31 復習）
   prompt: |
     下のコードが取得しているものとして正しいものを選んでください。
   code: |
@@ -88,5 +88,5 @@ pages:
   explanation: |-
     Playwright は **ヘッドレスブラウザ** を起動し、JavaScript を実行した **後の** DOM を取得できます。`page.content()` はレンダリング済み HTML を返すので、SPA など requests では取れないサイトに有効です。
 
-    **ありがちな誤り**: Streamlit の再実行モデルを意識せず重い処理を毎回走らせる、自動化で `pyautogui.FAILSAFE` を切ってしまう、Playwright で `headless=True` を忘れる等。
-    **詳しくは**: 章 30〜31 (Phase F) で実装パターンと安全装置を扱っています。
+    **ありがちな誤り**: Streamlit の再実行モデルを意識せず重い処理を毎回走らせる、自動化で `FAILSAFE` を切ってしまう、Playwright で `headless=True` を忘れる等。
+    **詳しくは**: 章 31 を再確認してください。

@@ -11,7 +11,7 @@ learning_goals:
 - matplotlib の基本的な描画コードの意味を理解する
 pages:
 - kind: reading
-  title: NumPy ブロードキャスト（章 11 復習）
+  title: NumPy ブロードキャスト（章 12 復習）
   prompt: |
     下のコードの出力として正しいものを選んでください。
   code: |
@@ -28,10 +28,10 @@ pages:
   explanation: |-
     NumPy 配列にスカラーを掛けると、ブロードキャストにより各要素にスカラーが掛けられます。`for` ループを書かずにベクトル演算が可能なのが NumPy の利点です。
 
-    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖をつけましょう。
-    **詳しくは**: 章 12〜15 (Phase B) の各章 sample に同じパターンが出てきます。
+    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖を。
+    **詳しくは**: 章 12 を再確認してください。
 - kind: reading
-  title: NumPy 配列の平均（章 11 復習）
+  title: NumPy 配列の平均（章 12 復習）
   prompt: |
     下のコードの出力として正しいものを選んでください。
   code: |
@@ -48,10 +48,10 @@ pages:
   explanation: |-
     平均は `(0.01 + (-0.02) + 0.03 + 0.04) / 4 = 0.06 / 4 = 0.015`。`ndarray.mean()` は全要素の算術平均を返します。
 
-    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖をつけましょう。
-    **詳しくは**: 章 12〜15 (Phase B) の各章 sample に同じパターンが出てきます。
+    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖を。
+    **詳しくは**: 章 12 を再確認してください。
 - kind: reading
-  title: pandas Series のインデックス（章 12 復習）
+  title: pandas Series のインデックス（章 13 復習）
   prompt: |
     下のコードの出力として正しいものを選んでください。
   code: |
@@ -68,10 +68,10 @@ pages:
   explanation: |-
     pandas の Series はラベル（index）でアクセスできます。`s["B"]` はラベル "B" に対応する値 `200` を返します。
 
-    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖をつけましょう。
-    **詳しくは**: 章 12〜15 (Phase B) の各章 sample に同じパターンが出てきます。
+    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖を。
+    **詳しくは**: 章 13 を再確認してください。
 - kind: reading
-  title: DataFrame の列フィルタ（章 12 復習）
+  title: DataFrame の列フィルタ（章 13 復習）
   prompt: |
     下のコードを実行すると、何が起きるか正しいものを選んでください。
   code: |
@@ -91,10 +91,10 @@ pages:
   explanation: |-
     `df["aum"] >= 100` でブール Series を作り、`df[...]` で行をフィルタ。残るのは A と B の行で、その `fund` 列を list 化すると `['A', 'B']`。
 
-    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖をつけましょう。
-    **詳しくは**: 章 12〜15 (Phase B) の各章 sample に同じパターンが出てきます。
+    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖を。
+    **詳しくは**: 章 13 を再確認してください。
 - kind: reading
-  title: matplotlib の描画関数（章 13 復習）
+  title: matplotlib の描画関数（章 14 復習）
   prompt: |
     下のコードはどんなグラフを描きますか？
   code: |
@@ -113,10 +113,10 @@ pages:
   explanation: |-
     `plt.plot(x, y)` は **折れ線グラフ** を描く関数です。棒グラフは `plt.bar`、散布図は `plt.scatter`、ヒストグラムは `plt.hist` を使います。
 
-    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖をつけましょう。
-    **詳しくは**: 章 12〜15 (Phase B) の各章 sample に同じパターンが出てきます。
+    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖を。
+    **詳しくは**: 章 14 を再確認してください。
 - kind: reading
-  title: scatter の役割（章 13 復習）
+  title: scatter の役割（章 14 復習）
   prompt: |
     下のコードの目的として最も近いものを選んでください。
   code: |
@@ -135,10 +135,10 @@ pages:
   explanation: |-
     `scatter` は 2 変数の点をプロットするので、共分散・相関の視覚的確認に使われます。x 軸 A、y 軸 B のリターンを散布図にすることで、両者の連動度を目で見ることができます。
 
-    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖をつけましょう。
-    **詳しくは**: 章 12〜15 (Phase B) の各章 sample に同じパターンが出てきます。
+    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖を。
+    **詳しくは**: 章 14 を再確認してください。
 - kind: reading
-  title: groupby 集計（章 14 復習）
+  title: groupby 集計（章 15 復習）
   prompt: |
     下のコードの出力として正しいものを選んでください。
   code: |
@@ -158,10 +158,10 @@ pages:
   explanation: |-
     `groupby("sector")` でセクター別に分け、`["ret"].mean()` で平均を取ります。IT は (0.10 + 0.20)/2 = 0.15、FIN は (0.05 + 0.15)/2 = 0.10。
 
-    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖をつけましょう。
-    **詳しくは**: 章 12〜15 (Phase B) の各章 sample に同じパターンが出てきます。
+    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖を。
+    **詳しくは**: 章 15 を再確認してください。
 - kind: reading
-  title: merge の挙動（章 14 復習）
+  title: merge の挙動（章 15 復習）
   prompt: |
     下のコードを実行したとき、結果の行数として正しいものを選んでください。
   code: |
@@ -180,5 +180,5 @@ pages:
   explanation: |-
     `how="inner"` は両方のキーに存在する行だけ残す内部結合。`fund` が共通なのは A と B のみなので結果は 2 行になります。
 
-    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖をつけましょう。
-    **詳しくは**: 章 12〜15 (Phase B) の各章 sample に同じパターンが出てきます。
+    **ありがちな誤り**: NumPy の `axis=0 / axis=1` 取り違え、pandas の `loc` と `iloc` の混同、matplotlib で `plt.show()` を忘れる等。`print(df.shape)` で形を確認する癖を。
+    **詳しくは**: 章 15 を再確認してください。
