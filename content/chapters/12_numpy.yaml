@@ -169,3 +169,50 @@ pages:
       wrong_hint1: "loc, scale, size の順。"
       wrong_hint2: "`0.0005`, `0.01`, `1000`。"
       wrong_hint3: "`0.0005`, `0.01`, `1000`。"
+
+  # ─── 参考実装: ベクトル化 vs Python ループのベンチマーク ──
+  - kind: sample
+    title: "参考実装 — ベクトル化 vs Python ループのベンチマーク"
+    markdown: |
+      ## なぜ NumPy が「桁違いに速い」のか
+
+      Python の `list` 上での加算は 1 要素ずつ Python レイヤの関数呼び出し。
+      NumPy の `ndarray` は **裏側で C 言語の SIMD 命令を使う** → 数十倍速くなる。
+
+      この差は **要素数が大きくなるほど顕著** で、金融の分単位データ (数十万行) では
+      Python ループだと 1 分、NumPy だと 0.1 秒、という差が出ます。
+
+      | 操作 | Python list | NumPy ndarray |
+      |---|---|---|
+      | 1 要素演算 | 同じくらい | 同じくらい |
+      | 1 万要素 | 1x (基準) | 約 10x 速い |
+      | **100 万要素** | 1x | **約 50-100x 速い** |
+    sample_code: |
+      import time
+      import numpy as np
+
+      sizes = [1_000, 10_000, 100_000, 1_000_000]
+      print(f"{'size':>10s}  {'list (ms)':>10s}  {'numpy (ms)':>10s}  {'speedup':>8s}")
+
+      for n in sizes:
+          a = list(range(n))
+          b = list(range(n))
+          arr_a = np.arange(n)
+          arr_b = np.arange(n)
+
+          # Python list 加算
+          t0 = time.perf_counter()
+          for _ in range(3):
+              _ = [x + y for x, y in zip(a, b)]
+          t_list = (time.perf_counter() - t0) / 3 * 1000
+
+          # NumPy 加算
+          t0 = time.perf_counter()
+          for _ in range(3):
+              _ = arr_a + arr_b
+          t_np = (time.perf_counter() - t0) / 3 * 1000
+
+          print(f"{n:>10,}  {t_list:>10.3f}  {t_np:>10.3f}  {t_list/t_np:>7.1f}x")
+    runnable: true
+    stickman: explain
+    stickman_speech: "Pythonでは「ループより配列」が鉄則。numpy 1 行で書けるなら絶対そっちを選ぶ。"

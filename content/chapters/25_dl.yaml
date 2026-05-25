@@ -170,3 +170,124 @@ pages:
       wrong_hint1: "`pred`, `y`, `backward`, `step`。"
       wrong_hint2: "`pred`, `y`, `backward`, `step`。"
       wrong_hint3: "`pred`, `y`, `backward`, `step`。"
+
+  # ─── 参考実装 ①: nn.Module サブクラス標準パターン ────────
+  - kind: sample
+    title: "参考実装 — nn.Module サブクラスで自前モデル"
+    markdown: |
+      ## 業界標準: クラスベースのモデル定義
+
+      `nn.Sequential` は手軽ですが、現実のモデル（残差接続、複数入力、条件分岐）には
+      **`nn.Module` をサブクラス化** するのが業界標準です。
+
+      **必須メソッド 2 つ**:
+      - `__init__`: 層を属性として登録 (`self.fc1 = nn.Linear(...)`)
+      - `forward(x)`: 入力 x からの計算フローを書く（`backward` は PyTorch が自動生成）
+
+      下は信用デフォルト予測の 2 層 MLP。`data/credit_default.csv` の特徴量 4 → 隠れ層 16 → 出力 1。
+      CPU で 100 epoch でも 1-2 秒で終わります。
+
+      **業界での使い方**:
+      - 研究論文の reference implementation は **ほぼ全てこの形式**
+      - HuggingFace, torchvision のモデルもサブクラス方式
+      - `Sequential` はトイ実装 / 試作用、本番は `Module` サブクラス
+    sample_code: |
+      import torch
+      import torch.nn as nn
+      import pandas as pd
+
+      df = pd.read_csv("data/credit_default.csv")
+      feats = ["age", "income", "debt_ratio", "n_defaults"]
+      X = torch.tensor(df[feats].values, dtype=torch.float32)
+      # 標準化 (本来は train のみで統計を取る)
+      X = (X - X.mean(dim=0)) / X.std(dim=0)
+      y = torch.tensor(df["default"].values, dtype=torch.float32).unsqueeze(1)
+
+      class CreditMLP(nn.Module):
+          def __init__(self, in_dim: int = 4, hidden: int = 16) -> None:
+              super().__init__()
+              self.fc1 = nn.Linear(in_dim, hidden)
+              self.fc2 = nn.Linear(hidden, 1)
+              self.act = nn.ReLU()
+
+          def forward(self, x: torch.Tensor) -> torch.Tensor:
+              h = self.act(self.fc1(x))
+              return torch.sigmoid(self.fc2(h))
+
+      torch.manual_seed(0)
+      model = CreditMLP()
+      opt = torch.optim.Adam(model.parameters(), lr=0.01)
+      loss_fn = nn.BCELoss()
+
+      for epoch in range(100):
+          opt.zero_grad()
+          loss = loss_fn(model(X), y)
+          loss.backward()
+          opt.step()
+          if epoch % 20 == 0:
+              acc = ((model(X) > 0.5).float() == y).float().mean().item()
+              print(f"epoch {epoch:3d}  loss={float(loss):.4f}  acc={acc:.3f}")
+      print("Done.")
+    runnable: true
+    stickman: explain
+    stickman_speech: "nn.Module サブクラス化は研究も実務も全部これ。Sequential はトイ実装用。"
+
+  # ─── 参考実装 ②: train / eval モード と no_grad の使い分け ──
+  - kind: sample
+    title: "参考実装 — train() / eval() / no_grad() の使い分け"
+    markdown: |
+      ## 推論時にこれを忘れるとバグる 3 つの API
+
+      | API | 役割 | いつ使う |
+      |---|---|---|
+      | `model.train()` | Dropout / BatchNorm を **学習モード** に | 学習ループ前 |
+      | `model.eval()`  | Dropout / BatchNorm を **推論モード** に | 推論・バリデーション前 |
+      | `with torch.no_grad():` | **勾配計算を無効化** | 推論中、メモリ削減 |
+
+      **典型的バグ**: `model.eval()` を忘れると Dropout が推論時にも発火して結果が毎回変わる。
+      `torch.no_grad()` を忘れるとメモリを食って GPU で OOM。
+
+      **推論の定石**:
+      ```python
+      model.eval()
+      with torch.no_grad():
+          y_pred = model(X_test)
+      ```
+
+      この Sample は Dropout 入りの分類器で 「train モード vs eval モード」 の出力差を見せます。
+    sample_code: |
+      import torch
+      import torch.nn as nn
+
+      torch.manual_seed(42)
+
+      class WithDropout(nn.Module):
+          def __init__(self) -> None:
+              super().__init__()
+              self.fc = nn.Linear(4, 4)
+              self.drop = nn.Dropout(p=0.5)  # 50% を学習時に落とす
+
+          def forward(self, x: torch.Tensor) -> torch.Tensor:
+              return self.drop(self.fc(x))
+
+      model = WithDropout()
+      x = torch.ones(1, 4)
+
+      print("--- train() モード (Dropout 発火、毎回違う) ---")
+      model.train()
+      for _ in range(3):
+          print(model(x).detach().numpy().round(3))
+
+      print("\n--- eval() モード (Dropout 無効、再現的) ---")
+      model.eval()
+      for _ in range(3):
+          print(model(x).detach().numpy().round(3))
+
+      print("\n--- no_grad() でメモリと速度を稼ぐ ---")
+      model.eval()
+      with torch.no_grad():
+          y = model(x)
+          print("requires_grad =", y.requires_grad)  # → False
+    runnable: true
+    stickman: explain
+    stickman_speech: "推論前に必ず eval() + no_grad()。これを忘れたバグはチーム全体を 1 日溶かす。"

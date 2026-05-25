@@ -182,3 +182,63 @@ pages:
       wrong_hint1: "`1` と `30`"
       wrong_hint2: "`1` と `30`"
       wrong_hint3: "`1` と `30`"
+
+  # ─── 参考実装: session_state と @cache_data の使い分け ──
+  - kind: sample
+    title: "参考実装 — session_state と @cache_data の使い分け"
+    markdown: |
+      ## Streamlit の「再実行モデル」対策
+
+      Streamlit はユーザーがボタンを押すたびに **スクリプト全体を再実行** します。
+      これによる困りごとを解決する 2 つの仕組みが必須:
+
+      | 仕組み | 解決する問題 | 使うべき場面 |
+      |---|---|---|
+      | `st.session_state` | 「ユーザー入力やカウンタが消える」 | フォーム値、ユーザー識別、進捗保存 |
+      | `@st.cache_data` | 「重い計算が毎回走る」 | CSV 読み込み、API 呼び出し、ML 推論 |
+
+      **業界の落とし穴**:
+      - `@cache_data` は **戻り値が同じ引数なら同じ値を返す** 前提。乱数や時刻には使わない
+      - `session_state` は **タブごとに独立**。マルチユーザーアプリではユーザー ID で分ける
+      - 大きな DataFrame をキャッシュすると **メモリ圧迫** → `ttl` (Time To Live) で有効期限指定
+
+      この Sample は実行しても Streamlit 起動はしませんが、ロジックの形を見せます。
+    sample_code: |
+      # 注: 本来は Streamlit アプリ内で動作。ここはロジック確認用のスタンドアロン版。
+      print("=== Streamlit パターンの擬似実装 ===\n")
+
+      # 1) session_state 的なグローバル状態 (本番では st.session_state.count)
+      _state = {"count": 0, "user_name": ""}
+
+      def increment():
+          _state["count"] += 1
+          return _state["count"]
+
+      print("ボタン 3 回押し:")
+      for _ in range(3):
+          print(f"  count = {increment()}")
+
+      # 2) @cache_data 的なキャッシュ機構
+      _cache = {}
+      def cached_load(path: str):
+          if path in _cache:
+              print(f"  [HIT]  {path}  → cache から即返却")
+              return _cache[path]
+          print(f"  [MISS] {path}  → 実際に CSV を読み込む (重い処理)")
+          import pandas as pd
+          df = pd.read_csv(path)
+          _cache[path] = df
+          return df
+
+      print("\n--- 同じ CSV を 3 回読む ---")
+      for _ in range(3):
+          cached_load("data/fund_returns.csv")
+
+      print("\n--- 本番 Streamlit では: ---")
+      print("  import streamlit as st")
+      print("  @st.cache_data(ttl=3600)  # 1 時間キャッシュ")
+      print("  def load_data():")
+      print("      return pd.read_csv('data/fund_returns.csv')")
+    runnable: true
+    stickman: explain
+    stickman_speech: "session_state は「消えると困る値」、cache_data は「重くて困る処理」。役割が違う。"

@@ -162,3 +162,56 @@ pages:
       wrong_hint1: "`{変数}` の形で埋め込むよ。"
       wrong_hint2: "`{name} ({age})` だね。"
       wrong_hint3: "答えは `{name} ({age})`。"
+
+  # ─── 参考実装: 金融計算での Decimal vs float ─────────────
+  - kind: sample
+    title: "参考実装 — 金額計算は Decimal、統計計算は float"
+    markdown: |
+      ## なぜ float では金額がズレるのか
+
+      Python の `float` は 2 進数 64 bit 浮動小数点。**10 進数 0.1 を正確に表せない**:
+
+      ```python
+      0.1 + 0.2     # → 0.30000000000000004  (!!)
+      ```
+
+      日々のリターン計算なら誤差は無視できるが、**会計や決済** の金額計算では
+      これが「1 円ズレ」になり、許されない。そこで `decimal.Decimal` を使う。
+
+      | 用途 | 型 |
+      |---|---|
+      | 統計・リターン・最適化 | **float** (numpy も float64) |
+      | 会計・請求・税金計算 | **Decimal** |
+      | 個数・ページ番号 | **int** |
+      | フラグ・有効/無効 | **bool** |
+
+      **業界ルール**:
+      - 「銀行が扱う金額」「証券の単元未満端数」は **必ず Decimal**
+      - リターン・ボラ・SR は float で OK
+      - 通貨間レートは context によって Decimal / float を使い分け
+    sample_code: |
+      from decimal import Decimal, getcontext
+
+      # 1) float での悲劇
+      total_float = 0.1 + 0.2
+      print(f"float : 0.1 + 0.2 = {total_float}  (!= 0.3)")
+      print(f"        0.3 と等しい? {total_float == 0.3}")
+
+      # 2) Decimal での厳密計算
+      total_dec = Decimal("0.1") + Decimal("0.2")
+      print(f"\nDecimal: 0.1 + 0.2 = {total_dec}  (== 0.3)")
+      print(f"         0.3 と等しい? {total_dec == Decimal('0.3')}")
+
+      # 3) 実務例: 1000 円の 8% 消費税
+      price = Decimal("1000")
+      tax_rate = Decimal("0.08")
+      tax = price * tax_rate
+      total = price + tax
+      print(f"\n価格: {price}, 税額: {tax}, 合計: {total}")
+
+      # 4) 精度を 28 桁 → 50 桁に変更
+      getcontext().prec = 50
+      print(f"\nDecimal(1) / Decimal(7) = {Decimal(1) / Decimal(7)}")
+    runnable: true
+    stickman: explain
+    stickman_speech: "リターンは float、お金は Decimal。これを覚えておくと現場で恥をかかないよ。"

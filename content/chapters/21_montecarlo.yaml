@@ -178,3 +178,51 @@ pages:
       wrong_hint1: "`percentile` と `5`。"
       wrong_hint2: "`percentile` と `5`。"
       wrong_hint3: "`percentile` と `5`。"
+
+  # ─── 参考実装: VaR と CVaR (Expected Shortfall) ────────────
+  - kind: sample
+    title: "参考実装 — VaR と CVaR (Basel III の要求指標)"
+    markdown: |
+      ## 「悪い方の裾」を 2 種類の指標で測る
+
+      モンテカルロで生成した将来パスから、リスク指標を直接計算できます。
+
+      $$ \text{VaR}_{95\%} = -\text{quantile}_{0.05}(\text{Loss}),\quad \text{CVaR}_{95\%} = -E[L \mid L > \text{VaR}_{95\%}] $$
+
+      | 指標 | 意味 | 業界での位置づけ |
+      |---|---|---|
+      | **VaR** (Value at Risk) | 「95% の確率でこれより悪くならない」損失水準 | 古典的、Basel II 以降の規制値 |
+      | **CVaR / ES** (Expected Shortfall) | VaR を **超えた** 場合の平均損失 | Basel III (2016〜) で VaR を補完 |
+
+      **なぜ CVaR が追加された?**:
+      - VaR は **テールの形** を無視する (1% 起きる暴落の深さを問わない)
+      - 2008 年危機で「VaR 内に収まっていたのに想定外の大損」が頻発
+      - そこで「VaR を超えたら平均でどれくらい損するか」を CVaR として併用
+
+      この Sample は 10000 本の GBM パスから 1 年後のリターン分布を作り、両指標を計算します。
+    sample_code: |
+      import numpy as np
+
+      np.random.seed(42)
+      S0, mu, sigma, T = 100, 0.05, 0.20, 1.0
+      n_paths = 10000
+      Z = np.random.standard_normal(n_paths)
+      ST = S0 * np.exp((mu - 0.5 * sigma ** 2) * T + sigma * np.sqrt(T) * Z)
+      loss = S0 - ST   # 損失 (プラスが損失)
+
+      var_95 = np.quantile(loss, 0.95)
+      var_99 = np.quantile(loss, 0.99)
+      cvar_95 = loss[loss >= var_95].mean()
+      cvar_99 = loss[loss >= var_99].mean()
+
+      print(f"パス数: {n_paths:,}")
+      print(f"期待損失: {loss.mean():.3f}  (期待リターンの符号反転)")
+      print(f"VaR  95%: {var_95:7.3f}  (この水準より大きい損失は 5%)")
+      print(f"CVaR 95%: {cvar_95:7.3f}  (95% VaR 超過時の平均損失)")
+      print(f"VaR  99%: {var_99:7.3f}")
+      print(f"CVaR 99%: {cvar_99:7.3f}")
+      print(f"\nCVaR は常に VaR よりも悪い: {cvar_95 > var_95 and cvar_99 > var_99}")
+    runnable: true
+    expected_output: "VaR"
+    stickman: explain
+    stickman_speech: "VaR は「ここまでなら」、CVaR は「超えたとき平均でどれくらい」。両方見るのが現代的。"

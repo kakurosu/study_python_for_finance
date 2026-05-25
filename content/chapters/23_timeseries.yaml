@@ -148,3 +148,88 @@ pages:
       wrong_hint1: "(1, 0, 0) を指定。"
       wrong_hint2: "`1`, `0`, `0`。"
       wrong_hint3: "`1`, `0`, `0`。"
+
+  # ─── 参考実装 ①: CPI に ARIMA(1,1,1) ─────────────────
+  - kind: sample
+    title: "参考実装 — マクロデータに ARIMA を当てる"
+    markdown: |
+      ## ARIMA(p, d, q) の各次数の意味
+
+      | 次数 | 何を表すか | よく使う値 |
+      |---|---|---|
+      | **p** | AR (Auto-Regressive) の次数 — 過去の値で説明 | 1-3 |
+      | **d** | 差分の階数 — 単位根を消す | **1** が圧倒的 (1 階差で定常化が多い) |
+      | **q** | MA (Moving Average) の次数 — 過去の誤差で説明 | 1-3 |
+
+      **業界の作法**:
+      1. **ADF 検定** で単位根を見る → 1 階差で定常化するか確認 (d=1 が多い)
+      2. ACF / PACF プロットで p / q の候補を絞る
+      3. AIC / BIC が最小の組み合わせを選ぶ (Grid Search)
+      4. 残差が白色雑音か Ljung-Box 検定で確認
+
+      この Sample は CPI 年率変化に ARIMA(1,1,1) を当て、フィット結果と次 6 か月予測を出します。
+    sample_code: |
+      import warnings
+      warnings.filterwarnings("ignore")
+      import pandas as pd
+      import numpy as np
+      from statsmodels.tsa.arima.model import ARIMA
+
+      df = pd.read_csv("data/macro_indicators.csv", parse_dates=["date"]).set_index("date")
+      cpi = df["CPI_yoy"]
+
+      model = ARIMA(cpi, order=(1, 1, 1))
+      res = model.fit()
+      print(res.summary().tables[1])
+
+      forecast = res.forecast(steps=6)
+      print("\n--- 次 6 か月の CPI YoY 予測 ---")
+      print(forecast.round(3))
+    runnable: true
+    stickman: explain
+    stickman_speech: "ARIMA は時系列の入門にして実務頻出。差分階数 d をどう取るかがすべての始まり。"
+
+  # ─── 参考実装 ②: ADF 検定で単位根を確認 ─────────────────
+  - kind: sample
+    title: "参考実装 — ADF 検定で定常性を判定"
+    markdown: |
+      ## 「差分を取るべきか」を統計的に判断する
+
+      ARIMA の `d` (差分階数) を決める前に、**Augmented Dickey-Fuller (ADF) 検定**で
+      系列が単位根を持つか（=非定常か）を確認します。
+
+      $$ H_0: \text{単位根あり (非定常)},\quad H_1: \text{定常} $$
+
+      **判断**:
+      - p 値 < 0.05 → 帰無棄却 → **定常** → 差分不要 (`d=0`)
+      - p 値 ≥ 0.05 → 棄却できない → **非定常** → 1 階差を取って再検定 (`d=1`)
+      - それでもダメなら 2 階差 (`d=2`) — まれ
+
+      **業界での注意**:
+      - **株価そのもの** はほぼ常に非定常 (d=1 が必要)
+      - **株価リターン** はほぼ常に定常 (d=0 で OK)
+      - 金利・CPI などマクロは判断が分かれる → ADF 必須
+    sample_code: |
+      import warnings
+      warnings.filterwarnings("ignore")
+      import pandas as pd
+      from statsmodels.tsa.stattools import adfuller
+
+      df = pd.read_csv("data/macro_indicators.csv", parse_dates=["date"]).set_index("date")
+      cpi = df["CPI_yoy"]
+
+      def report(series, name: str) -> None:
+          stat, p, *_ = adfuller(series.dropna())
+          verdict = "定常 (棄却 ○)" if p < 0.05 else "非定常 (棄却 ×)"
+          print(f"{name:20s}: ADF stat={stat:7.3f}  p={p:.4f}  {verdict}")
+
+      report(cpi, "CPI level")
+      report(cpi.diff(), "CPI 1st diff")
+      # 比較: 株価 (大抵 d=1 が必要)
+      px = pd.read_csv("data/stocks_daily.csv", parse_dates=["date"]).set_index("date")["AAPL_jp"]
+      report(px, "Stock price level")
+      report(px.pct_change(), "Stock returns")
+    runnable: true
+    expected_output: "ADF stat"
+    stickman: explain
+    stickman_speech: "差分を取るかは「迷ったら ADF」。これを習慣化すると時系列の取り扱いが安定する。"

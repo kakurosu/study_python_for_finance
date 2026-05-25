@@ -166,3 +166,109 @@ pages:
       wrong_hint1: "`RandomForestRegressor` と `predict`。"
       wrong_hint2: "`RandomForestRegressor` と `predict`。"
       wrong_hint3: "`RandomForestRegressor` と `predict`。"
+
+  # ─── 参考実装 ①: train/test split → fit → predict 標準フロー ──
+  - kind: sample
+    title: "参考実装 — train/test split で住宅価格を回帰"
+    markdown: |
+      ## scikit-learn の業界標準ワークフロー
+
+      ```
+      1. データ取得                     pd.read_csv(...)
+      2. 特徴量 X / 目的変数 y に分割    X = df[feats]; y = df["target"]
+      3. train/test に分割               train_test_split(X, y, test_size=0.2)
+      4. モデル選択                     model = LinearRegression()
+      5. 学習                           model.fit(X_train, y_train)
+      6. 予測                           y_pred = model.predict(X_test)
+      7. 評価                           r2_score(y_test, y_pred)
+      ```
+
+      この 7 ステップは **どんなモデルでも同じ** (sklearn の API 統一性)。
+      `LinearRegression` を `RandomForestRegressor` に変えるだけで動く。
+
+      **重要な原則**:
+      - **train データに対する性能** は信用しない (過学習で 100% に近づく)
+      - **test データに対する性能** が「本当の予測力」
+      - `random_state` を固定 → 再現性確保
+    sample_code: |
+      import pandas as pd
+      from sklearn.linear_model import LinearRegression
+      from sklearn.model_selection import train_test_split
+      from sklearn.metrics import r2_score, mean_absolute_error
+
+      df = pd.read_csv("data/house_prices.csv")
+      feats = ["area", "bedrooms", "age", "station_min"]
+      X = df[feats]
+      y = df["price"]
+
+      X_train, X_test, y_train, y_test = train_test_split(
+          X, y, test_size=0.2, random_state=42,
+      )
+      model = LinearRegression()
+      model.fit(X_train, y_train)
+      y_pred = model.predict(X_test)
+
+      print(f"train R^2 = {model.score(X_train, y_train):.3f}")
+      print(f"test  R^2 = {r2_score(y_test, y_pred):.3f}")
+      print(f"test  MAE = {mean_absolute_error(y_test, y_pred):,.0f} 万円")
+
+      print("\n--- 学習された係数 (1 単位あたり価格への効き) ---")
+      for f, c in zip(feats, model.coef_):
+          print(f"  {f:12s}: {c:+10.2f}")
+      print(f"  intercept   : {model.intercept_:+10.2f}")
+    runnable: true
+    stickman: explain
+    stickman_speech: "fit → predict → score の流れは sklearn の合言葉。これさえ覚えれば 1000 個のモデルを使える。"
+
+  # ─── 参考実装 ②: Pipeline で標準化を train だけに当てる ─────
+  - kind: sample
+    title: "参考実装 — Pipeline で前処理リーケージを防ぐ"
+    markdown: |
+      ## 「test の統計量を train に混ぜない」 = データリーケージ防止
+
+      **NG な例** (よくある初学者ミス):
+      ```python
+      X_scaled = StandardScaler().fit_transform(X)   # ← 全データで統計を取る!
+      X_train, X_test, ... = train_test_split(X_scaled, y)
+      ```
+      これは **test データの平均・標準偏差が train に混入** している。本番性能を過大評価。
+
+      **正しい流れ** (Pipeline で自動化):
+      ```python
+      pipe = Pipeline([("scaler", StandardScaler()),
+                       ("model",  LinearRegression())])
+      pipe.fit(X_train, y_train)   # ← scaler は train だけで fit
+      pipe.predict(X_test)         # ← test には fitted scaler を transform するだけ
+      ```
+
+      **業界での意義**:
+      - **クロスバリデーション** で 5 fold 回す場合、各 fold で前処理を独立に学習しないと
+        報告される CV スコアが楽観バイアス
+      - Pipeline は GridSearchCV / cross_val_score と組み合わせると自動でこれをやってくれる
+      - Kaggle 上位陣はほぼ全員 Pipeline を使う
+    sample_code: |
+      import pandas as pd
+      from sklearn.linear_model import LinearRegression
+      from sklearn.preprocessing import StandardScaler
+      from sklearn.pipeline import Pipeline
+      from sklearn.model_selection import train_test_split, cross_val_score
+
+      df = pd.read_csv("data/house_prices.csv")
+      X = df[["area", "bedrooms", "age", "station_min"]]
+      y = df["price"]
+      X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+      pipe = Pipeline([
+          ("scaler", StandardScaler()),
+          ("model",  LinearRegression()),
+      ])
+      pipe.fit(X_train, y_train)
+      print(f"test R^2 (single split) = {pipe.score(X_test, y_test):.3f}")
+
+      # クロスバリデーション (5 fold) — 各 fold で scaler が独立に fit される
+      cv_scores = cross_val_score(pipe, X_train, y_train, cv=5, scoring="r2")
+      print(f"\n5-fold CV R^2 = {cv_scores.mean():.3f}  ± {cv_scores.std():.3f}")
+      print(f"  individual folds: {cv_scores.round(3)}")
+    runnable: true
+    stickman: explain
+    stickman_speech: "前処理は Pipeline で包む。これだけでリーケージ事故が一気に消える。"

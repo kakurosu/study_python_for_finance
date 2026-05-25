@@ -119,3 +119,59 @@ pages:
       wrong_hint1: "条件は `> 0`、本体は `win += 1`。"
       wrong_hint2: "答えは `> 0` と `win += 1`。"
       wrong_hint3: "答えは `> 0` と `win += 1`。"
+
+  # ─── 参考実装: リスト内包 vs for ループ vs NumPy ベクトル化 ──
+  - kind: sample
+    title: "参考実装 — for ループ / リスト内包 / NumPy ベクトル化の速度比較"
+    markdown: |
+      ## 同じ処理、3 つの書き方、3 つの速度
+
+      Python で「リターン系列に税率を掛けて配当を加える」処理を例に、3 通り書きます。
+
+      | スタイル | 例 | 速度 (10 万要素) |
+      |---|---|---|
+      | for ループ | `for r in xs: out.append(...)` | 遅い (基準) |
+      | リスト内包 | `[r*0.8 + 0.001 for r in xs]` | 1.5-2x 速い |
+      | NumPy ベクトル化 | `arr * 0.8 + 0.001` | **20-50x 速い** |
+
+      **使い分け**:
+      - 100 要素以下 → 好きな書き方で OK
+      - 1 万〜 → リスト内包推奨（可読性◎、numpy 不要）
+      - 10 万〜 → **必ず NumPy** (Python ループは遅すぎる)
+
+      **金融特有の落とし穴**:
+      - 1 日 4 万ティック × 200 銘柄 = 800 万要素 → for ループだと 1 分以上
+      - 同じ計算が numpy なら 0.1 秒
+      - 「現場の自動化スクリプト」で速度問題に当たったら、まず for をベクトル化
+    sample_code: |
+      import time
+      import numpy as np
+
+      n = 100_000
+      data = [0.001 * (i % 100 - 50) for i in range(n)]
+
+      # ① for ループ
+      t0 = time.perf_counter()
+      out1 = []
+      for r in data:
+          out1.append(r * 0.8 + 0.001)
+      t1 = time.perf_counter() - t0
+
+      # ② リスト内包
+      t0 = time.perf_counter()
+      out2 = [r * 0.8 + 0.001 for r in data]
+      t2 = time.perf_counter() - t0
+
+      # ③ NumPy ベクトル化
+      arr = np.array(data)
+      t0 = time.perf_counter()
+      out3 = arr * 0.8 + 0.001
+      t3 = time.perf_counter() - t0
+
+      print(f"for ループ      : {t1*1000:7.2f} ms")
+      print(f"リスト内包      : {t2*1000:7.2f} ms  ({t1/t2:5.1f}x faster)")
+      print(f"NumPy ベクトル化: {t3*1000:7.2f} ms  ({t1/t3:5.1f}x faster)")
+      print(f"\n結果が一致: {all(abs(a-b) < 1e-9 for a, b in zip(out1, out3))}")
+    runnable: true
+    stickman: explain
+    stickman_speech: "ループ → 内包 → ベクトル化 と進むのが Python 修行の道筋。速度差は身体で覚えよう。"

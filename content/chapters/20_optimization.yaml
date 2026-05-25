@@ -151,3 +151,130 @@ pages:
       wrong_hint1: "`'eq'`"
       wrong_hint2: "`'eq'`"
       wrong_hint3: "`'eq'`"
+
+  # ─── 参考実装 ①: 効率的フロンティアを描く ────────────────
+  - kind: sample
+    title: "参考実装 — 効率的フロンティア (Markowitz)"
+    markdown: |
+      ## 「リスク と リターン の最良トレードオフ」を線で描く
+
+      Markowitz の最適化問題:
+
+      $$ \min_{\mathbf{w}}\ \mathbf{w}^\top \Sigma \mathbf{w} \quad \text{s.t.}\ \mathbf{w}^\top \mu = \mu_{\text{target}},\ \sum w_i = 1 $$
+
+      ターゲット期待リターン $\mu_{\text{target}}$ を動かして繰り返し解くと、
+      **(リスク, リターン) の平面に下に凸の曲線** が描けます。これが **効率的フロンティア**。
+
+      **業界の使い方**:
+      - 顧客のリスク許容度に合わせて「フロンティア上の最適点」を提案
+      - **接線ポートフォリオ** (リスクフリー線と接する点) が最大 Sharpe
+      - **GMV ポートフォリオ** (最小分散) がフロンティア左端
+
+      **批判点（業界の常識）**:
+      - 共分散・期待リターンの **推定誤差に極端に弱い** (Michaud の指摘)
+      - 結果は短期データで激しく揺れる → ロバスト最適化 / Black-Litterman で補強
+    sample_code: |
+      import numpy as np
+      import pandas as pd
+      from scipy.optimize import minimize
+      import matplotlib.pyplot as plt
+
+      df = pd.read_csv("data/returns_monthly.csv", index_col="YearMonth")
+      mu = df.mean().values * 12               # 年率期待リターン
+      Sigma = df.cov().values * 12             # 年率共分散
+      n = len(mu)
+
+      def port_vol(w):
+          return float(np.sqrt(w @ Sigma @ w))
+
+      def neg_port_ret(w):
+          return -float(w @ mu)
+
+      # 効率的フロンティア: target リターンを走査して最小分散を求める
+      targets = np.linspace(mu.min(), mu.max(), 25)
+      vols, rets = [], []
+      bounds = [(0, 1)] * n     # ロングオンリー
+      for t in targets:
+          cons = [
+              {"type": "eq", "fun": lambda w: np.sum(w) - 1},
+              {"type": "eq", "fun": lambda w, t=t: w @ mu - t},
+          ]
+          x0 = np.ones(n) / n
+          res = minimize(port_vol, x0, method="SLSQP", bounds=bounds, constraints=cons)
+          if res.success:
+              vols.append(port_vol(res.x))
+              rets.append(t)
+
+      fig, ax = plt.subplots(figsize=(7, 5))
+      ax.plot(vols, rets, color="crimson", linewidth=2, label="Efficient Frontier")
+      # 個別資産もプロット
+      for i, name in enumerate(df.columns):
+          ax.scatter(np.sqrt(Sigma[i, i]), mu[i], s=60)
+          ax.annotate(name, (np.sqrt(Sigma[i, i]), mu[i]), fontsize=9,
+                      xytext=(5, 5), textcoords="offset points")
+      ax.set_xlabel("Annualised Volatility")
+      ax.set_ylabel("Annualised Return")
+      ax.set_title("Efficient Frontier (long-only, 6 assets)")
+      ax.grid(True, alpha=0.3)
+      ax.legend()
+      fig.tight_layout()
+      plt.show()
+    runnable: true
+    stickman: explain
+    stickman_speech: "曲線の上にある点だけが「効率的」。個別資産は曲線より右下、つまり非効率。"
+
+  # ─── 参考実装 ②: リスクパリティ ─────────────────────────
+  - kind: sample
+    title: "参考実装 — リスクパリティ（業界の対立アプローチ）"
+    markdown: |
+      ## Markowitz の批判から生まれた「リスク均等配分」
+
+      Markowitz は **期待リターン** に依存しますが、これは推定が非常に難しい。
+      そこで Bridgewater の Ray Dalio らが提唱したのが **リスクパリティ**:
+
+      - 期待リターンは **使わない**
+      - 代わりに **全資産のリスク寄与 (component contribution) を均等** にする
+      - 結果として、低ボラ資産 (債券など) が **大きなウェイト** を持つ
+
+      最適化問題:
+
+      $$ \min_{\mathbf{w}}\ \sum_{i=1}^{n} \left( \frac{w_i (\Sigma \mathbf{w})_i}{\mathbf{w}^\top \Sigma \mathbf{w}} - \frac{1}{n} \right)^2 $$
+
+      **業界での位置づけ**:
+      - All Weather (Bridgewater) や Risk Parity ETF の中心戦略
+      - 「**マクロ局面に頑健**」と評価される一方、低金利環境ではレバレッジ依存に
+      - Markowitz と並んで覚えておくべき 2 大アプローチ
+    sample_code: |
+      import numpy as np
+      import pandas as pd
+      from scipy.optimize import minimize
+
+      df = pd.read_csv("data/returns_monthly.csv", index_col="YearMonth")
+      Sigma = df.cov().values * 12
+      n = Sigma.shape[0]
+      target = np.ones(n) / n   # 各資産のリスク寄与を 1/n に
+
+      def risk_contrib(w):
+          port_var = float(w @ Sigma @ w)
+          mcr = Sigma @ w
+          return (w * mcr) / port_var
+
+      def loss(w):
+          return float(np.sum((risk_contrib(w) - target) ** 2))
+
+      x0 = np.ones(n) / n
+      cons = [{"type": "eq", "fun": lambda w: np.sum(w) - 1}]
+      bounds = [(1e-4, 1.0)] * n
+      res = minimize(loss, x0, method="SLSQP", bounds=bounds, constraints=cons)
+      w_rp = res.x
+
+      print("Risk-Parity weights:")
+      for name, w in zip(df.columns, w_rp):
+          print(f"  {name:12s}: {w*100:6.2f}%")
+      print(f"\nLoss (smaller is better): {loss(w_rp):.6f}")
+      print("Risk contribution share:")
+      for name, c in zip(df.columns, risk_contrib(w_rp)):
+          print(f"  {name:12s}: {c*100:6.2f}%")
+    runnable: true
+    stickman: explain
+    stickman_speech: "期待リターンに頼らないのがミソ。Bridgewater が世界最大ヘッジファンドになった戦略。"

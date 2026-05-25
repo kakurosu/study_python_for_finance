@@ -141,3 +141,47 @@ pages:
       wrong_hint1: "`goto`"
       wrong_hint2: "`goto`"
       wrong_hint3: "`goto`"
+
+  # ─── 参考実装: Playwright headless でページスクショ ────
+  - kind: sample
+    title: "参考実装 — Playwright headless でスクリーンショット保存"
+    markdown: |
+      ## 「ブラウザを開かずに」スクショを撮る
+
+      `headless=True` は **画面に表示せず裏で動かす** モード。CI / バッチ実行で必須。
+
+      **業界での使い道**:
+      - 毎朝、レポート Web をスクショして PDF 添付メール送信
+      - サイトのデザイン変更を毎日検出 (visual regression)
+      - **ユーザー名・パスワード** を入力してログイン後画面を撮る (要 secret 管理)
+
+      **安全装置** (人間の作業を上書きしないため):
+      - `pyautogui.FAILSAFE = True` (画面左上にカーソルを動かすと例外で停止)
+      - `pyautogui.PAUSE = 0.5` (各操作の間に 0.5 秒待つ)
+      - Playwright は **完全に別ブラウザ** なので人間の作業に干渉しない (より安全)
+    sample_code: |
+      # この Sample は本来 Playwright ブラウザを起動するため、本セッションでは
+      # 「擬似的に手順を示す」形に留めます。実 Playwright 実行例は次の通り:
+      print("=== Playwright headless screenshot の擬似手順 ===\n")
+      print("from playwright.sync_api import sync_playwright")
+      print()
+      print("with sync_playwright() as p:")
+      print("    browser = p.chromium.launch(headless=True)   # 画面非表示")
+      print("    page    = browser.new_page()")
+      print("    page.goto('https://example.com')")
+      print("    page.wait_for_load_state('networkidle')      # 完全読込まで待機")
+      print("    page.screenshot(path='example.png', full_page=True)")
+      print("    browser.close()")
+      print()
+      print("--- 業界での運用例 ---")
+      print("- 毎朝 6:00 cron で実行 → 主要 30 サイトをスクショ")
+      print("- 前日との pixel diff > 5% でアラート (visual regression)")
+      print("- スクショは S3 / Azure Blob に日付付きで保管 → 監査証跡")
+      print()
+      print("--- 安全装置 ---")
+      print("- headless=True で人間の画面を奪わない")
+      print("- timeout 30 秒で固まったら強制終了")
+      print("- 失敗 3 回でアラート、自動リカバリ後に再試行")
+    runnable: true
+    stickman: explain
+    stickman_speech: "Playwright headless は「夜中に黙々と働くロボット」のための仕組み。"

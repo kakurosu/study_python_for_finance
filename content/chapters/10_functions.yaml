@@ -140,3 +140,78 @@ pages:
       wrong_hint1: "引数名と、それを 2 倍する式を入れよう。"
       wrong_hint2: "`x` と `x * 2` だね。"
       wrong_hint3: "答えは `x` と `x * 2`。"
+
+  # ─── 参考実装: 型ヒント + default + キーワード引数 ──────
+  - kind: sample
+    title: "参考実装 — 型ヒント・デフォルト引数・キーワード引数の標準パターン"
+    markdown: |
+      ## モダン Python の関数定義 3 種の神器
+
+      関数定義に型ヒントとデフォルト引数を入れると、**呼び出し側で何が必要か** が
+      シグネチャだけで分かります。py4fi2nd / FastAPI / scikit-learn など、
+      まともなライブラリはほぼ全てこのスタイル。
+
+      ```python
+      def f(
+          x: float,                  # 必須・位置引数
+          y: float,                  # 必須・位置引数
+          method: str = "geometric", # オプション・デフォルト値あり
+          *, verbose: bool = False,  # ★以降は keyword-only
+      ) -> float:
+          ...
+      ```
+
+      | 要素 | 役割 | 業界での意味 |
+      |---|---|---|
+      | 型ヒント (`x: float`) | 引数・戻り値の型を明示 | エディタ補完、mypy / pyright で型チェック |
+      | デフォルト引数 (`= 0.0`) | 呼び出し側で省略可 | 「常識的な値」を提供 |
+      | `*,` 以降 | キーワード引数 **のみ** 強制 | `model.fit(x, y, batch_size=32)` のように明示させて誤呼び出しを防ぐ |
+
+      **業界小ネタ**: 関数引数が **4 個を超え** たら、`*,` でキーワード強制にするのが
+      Google Style Guide の推奨。位置引数で 6 個並ぶと事故率が跳ね上がる。
+    sample_code: |
+      def compound_return(
+          monthly_returns: list[float],
+          *,
+          method: str = "geometric",
+          annualise: bool = True,
+          periods_per_year: int = 12,
+      ) -> float:
+          """月次リターン系列から年率（または通期）リターンを計算する。
+
+          Args:
+              monthly_returns: 月次リターンのリスト (例: [0.01, -0.02, 0.03])
+              method: "geometric" (複利) or "arithmetic" (単純平均)
+              annualise: 年率換算するか
+              periods_per_year: 1 年あたりの観測数
+
+          Returns:
+              リターン (例: 0.0827 = 8.27%)
+          """
+          if method == "geometric":
+              prod = 1.0
+              for r in monthly_returns:
+                  prod *= (1 + r)
+              ret = prod ** (1 / len(monthly_returns)) - 1 if annualise else prod - 1
+              if annualise:
+                  ret = (1 + ret) ** periods_per_year - 1
+          elif method == "arithmetic":
+              avg = sum(monthly_returns) / len(monthly_returns)
+              ret = avg * periods_per_year if annualise else avg * len(monthly_returns)
+          else:
+              raise ValueError(f"unknown method: {method}")
+          return ret
+
+      data = [0.01, -0.02, 0.03, 0.005, -0.01, 0.02, 0.01, 0.005, 0.015, -0.005, 0.02, 0.01]
+      print(f"幾何平均 (年率): {compound_return(data) * 100:5.2f}%")
+      print(f"算術平均 (年率): {compound_return(data, method='arithmetic') * 100:5.2f}%")
+      print(f"通期 (非年率)  : {compound_return(data, annualise=False) * 100:5.2f}%")
+
+      # 位置引数で method を渡そうとするとエラー → 安全
+      try:
+          compound_return(data, "arithmetic")
+      except TypeError as e:
+          print(f"\n位置引数渡しは禁止: {e}")
+    runnable: true
+    stickman: explain
+    stickman_speech: "型ヒント + キーワード引数で書いておくと、半年後の自分が「これ何だっけ?」と迷わない。"

@@ -149,3 +149,107 @@ pages:
       wrong_hint1: "`len(text) // 4`"
       wrong_hint2: "`len(text) // 4`"
       wrong_hint3: "`len(text) // 4`"
+
+  # ─── 参考実装 ①: ヘッドライン sentiment 分類 (モック) ────
+  - kind: sample
+    title: "参考実装 — ヘッドライン sentiment 分類（モック実装）"
+    markdown: |
+      ## LLM を業務に組み込む典型パターン
+
+      ニュースヘッドラインを **positive / negative / neutral** に分類するのは
+      クオンツ運用での頻出タスク (sentiment factor)。
+
+      **本番では**:
+      ```python
+      from openai import OpenAI
+      client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+      resp = client.chat.completions.create(
+          model="gpt-4o-mini",
+          messages=[
+              {"role": "system", "content": "Classify the sentiment as positive/negative/neutral."},
+              {"role": "user",   "content": headline},
+          ],
+      )
+      ```
+      しかし学習用のこのアプリでは **モック** (固定キーワード判定) で代用します。
+
+      **業界での運用ポイント**:
+      - **キャッシュ**: 同じヘッドラインは再リクエストしない (コスト削減)
+      - **バッチ**: 50-100 件をまとめて 1 リクエスト (レイテンシ短縮)
+      - **コスト管理**: GPT-4o は 1000 トークン約 $0.005、月次運用で予算上限を設定
+      - **fallback**: API エラー時は前回値 or "neutral" にする
+    sample_code: |
+      import pandas as pd
+
+      # モック関数: 本来は OpenAI / Anthropic API を呼ぶ
+      def classify_sentiment(headline: str) -> str:
+          pos_kw = ["beat", "surge", "rally", "win", "approve", "boost", "expand", "exceed"]
+          neg_kw = ["plunge", "probe", "sell-off", "recall", "tumble", "miss", "strike", "tension"]
+          h = headline.lower()
+          if any(k in h for k in pos_kw):
+              return "positive"
+          if any(k in h for k in neg_kw):
+              return "negative"
+          return "neutral"
+
+      df = pd.read_csv("data/sentiment_corpus.csv")
+      df["predicted"] = df["headline"].apply(classify_sentiment)
+      df["correct"]   = df["predicted"] == df["sentiment"]
+
+      print(f"Accuracy: {df['correct'].mean() * 100:.1f}% ({df['correct'].sum()}/{len(df)})")
+      print("\n--- 誤分類された例 ---")
+      print(df[~df["correct"]].head(5)[["headline", "sentiment", "predicted"]])
+    runnable: true
+    expected_output: "Accuracy"
+    stickman: explain
+    stickman_speech: "本番は OpenAI / Anthropic API 呼出だけど、ロジック構造はモックと全く同じ。"
+
+  # ─── 参考実装 ②: prompt engineering の基本 ───────────
+  - kind: sample
+    title: "参考実装 — Prompt engineering のベストプラクティス"
+    markdown: |
+      ## LLM の出力品質はプロンプトで決まる
+
+      | 原則 | 説明 | 例 |
+      |---|---|---|
+      | **役割を与える** | system role で「あなたは XX 専門家」 | "You are a financial analyst." |
+      | **具体例を見せる** | few-shot で 2-3 例 | "Input: X / Output: Y" を 3 つ |
+      | **出力フォーマット指定** | "JSON で返して" など明示 | `{"sentiment": "...", "confidence": ...}` |
+      | **段階的思考** | "Think step by step" | 推論の質が劇的に上がる |
+      | **temperature** | 0 = 決定的、1 = 創造的 | 分類は 0、文章生成は 0.7 |
+
+      **業界の落とし穴**:
+      - 「JSON で返して」と書いただけだと `{ ... }` の前後に余計な文章が混入
+        → `response_format={"type": "json_object"}` (OpenAI) を明示
+      - temperature=0 でも完全に決定的ではない (モデルが微妙に揺れる)
+      - **prompt injection**: ユーザー入力に「指示を無視して〜」が混入すると暴走
+        → ユーザー入力は **system role には絶対に入れない**
+    sample_code: |
+      # 良いプロンプト構造の擬似コード
+      def build_messages(headline: str) -> list[dict]:
+          return [
+              {
+                  "role": "system",
+                  "content": (
+                      "You are a financial sentiment classifier. "
+                      "Classify the headline as exactly one of: positive, negative, neutral. "
+                      "Output strictly as JSON: {\"sentiment\": \"...\", \"confidence\": 0.0-1.0}."
+                  ),
+              },
+              # Few-shot examples
+              {"role": "user",      "content": "Apple beats earnings estimates"},
+              {"role": "assistant", "content": '{"sentiment": "positive", "confidence": 0.95}'},
+              {"role": "user",      "content": "SEC opens probe into accounting"},
+              {"role": "assistant", "content": '{"sentiment": "negative", "confidence": 0.92}'},
+              # 本番の質問
+              {"role": "user", "content": headline},
+          ]
+
+      messages = build_messages("Quarterly earnings beat analyst estimates by wide margin")
+      print(f"Total messages: {len(messages)}")
+      for i, m in enumerate(messages):
+          print(f"  [{i}] role={m['role']:9s}  content={m['content'][:60]!r}")
+      print("\n本番では:  client.chat.completions.create(model=..., messages=messages, temperature=0)")
+    runnable: true
+    stickman: explain
+    stickman_speech: "役割 → 例 → 質問。この順番が LLM 仕事の基本フォーマット。"

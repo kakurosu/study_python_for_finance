@@ -104,3 +104,43 @@ pages:
       wrong_hint1: "最小値関数は min。"
       wrong_hint2: "`min(r)` だね。"
       wrong_hint3: "答えは `min(r)`。"
+
+  # ─── 参考実装: 金融でよく使う組み込み関数集 ───────────
+  - kind: sample
+    title: "参考実装 — 金融頻出の組み込み関数 8 選"
+    markdown: |
+      ## 「numpy を使う前に」覚えるべき組み込み関数
+
+      Python の組み込み関数だけでも、簡単な金融計算は書けます。
+      これらは **import 不要・どこでも使える** ので、numpy より先に手に馴染ませる。
+
+      | 関数 | 用途 | 金融での例 |
+      |---|---|---|
+      | `sum(iter)` | 合計 | ポートフォリオ重み合計 = 1 確認 |
+      | `min(iter) / max(iter)` | 最小・最大 | 最大ドローダウン、最高値 |
+      | `abs(x)` | 絶対値 | リターン乖離の絶対値 |
+      | `round(x, n)` | 四捨五入 | 表示用 (実計算は使わない) |
+      | `len(iter)` | 要素数 | サンプルサイズ N |
+      | `sorted(iter)` | 並び替え | スコアでファンドランキング |
+      | `enumerate(iter)` | index 付き反復 | (期間, 値) を列挙 |
+      | `zip(a, b)` | 同時反復 | (ticker, weight) ペア処理 |
+    sample_code: |
+      returns = [0.03, -0.01, 0.05, -0.02, 0.04, 0.01, -0.03]
+
+      print(f"合計リターン (単純加算): {sum(returns) * 100:+.2f}%")
+      print(f"最大月次 : {max(returns) * 100:+.2f}%")
+      print(f"最小月次 : {min(returns) * 100:+.2f}%")
+      print(f"絶対値合計: {sum(abs(r) for r in returns) * 100:.2f}%  (総取引活動度)")
+      print(f"平均     : {sum(returns) / len(returns) * 100:+.3f}%")
+
+      # ティッカー + 重みのペア処理
+      tickers = ["AAPL", "MSFT", "GOOG", "AMZN"]
+      weights = [0.30, 0.25, 0.25, 0.20]
+      print(f"\nポートフォリオ重み合計: {sum(weights):.2f}  (== 1.00 でなければ NG)")
+
+      print("\n--- 銘柄一覧 (重み降順) ---")
+      for i, (t, w) in enumerate(sorted(zip(tickers, weights), key=lambda x: -x[1]), 1):
+          print(f"  {i}. {t}: {w*100:5.2f}%")
+    runnable: true
+    stickman: explain
+    stickman_speech: "組み込み関数だけで意外と書ける。numpy は配列が必要になってから入れればいい。"

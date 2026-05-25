@@ -135,3 +135,57 @@ pages:
       wrong_hint1: "`find_all`"
       wrong_hint2: "`find_all`"
       wrong_hint3: "`find_all`"
+
+  # ─── 参考実装: lxml + xpath vs BeautifulSoup の対比 ─────
+  - kind: sample
+    title: "参考実装 — lxml + XPath と BeautifulSoup の対比"
+    markdown: |
+      ## 2 大スクレイピング ライブラリの使い分け
+
+      | 項目 | BeautifulSoup | lxml + XPath |
+      |---|---|---|
+      | 学習コスト | **低い** (英語っぽい API) | やや高い (XPath 構文) |
+      | 速度 | 普通 | **数倍速い** |
+      | パース耐性 | 壊れた HTML に強い | 厳密な XML 向き (HTML パーサもあり) |
+      | 複雑な抽出 | ネストすると冗長 | **XPath 1 行** で書ける |
+
+      **業界での選択**:
+      - 試作 / 1 回限り → BeautifulSoup (書きやすさ優先)
+      - 本番 / 大量サイト → lxml (速度・XPath の表現力)
+      - **両方** インポートして使い分けるチームも多い
+
+      **共通の現場ルール**:
+      - `robots.txt` を必ず確認
+      - リクエスト間隔は **最低 1 秒**、可能なら 3-5 秒
+      - User-Agent を明示 (`requests.get(url, headers={"User-Agent": "my-bot/0.1"})`)
+      - サイト改修で壊れることを前提に、抽出が失敗したら **fallback** とアラート
+    sample_code: |
+      from pathlib import Path
+
+      # 既存の data/sample_finance_news.html を両方で解析してみる
+      html_path = Path("data/sample_finance_news.html")
+      html = html_path.read_text(encoding="utf-8") if html_path.exists() else "<html><body><h1 class='headline'>Demo News</h1><div class='body'>Hello world.</div></body></html>"
+
+      # === A) BeautifulSoup ===
+      from bs4 import BeautifulSoup
+      soup = BeautifulSoup(html, "html.parser")
+      bs_headline = soup.find(class_="headline")
+      print(f"[BS]   headline text: {bs_headline.get_text(strip=True) if bs_headline else '(not found)'}")
+
+      # === B) lxml + XPath ===
+      try:
+          from lxml import html as lxml_html
+          tree = lxml_html.fromstring(html)
+          xpath_headline = tree.xpath("//*[contains(@class, 'headline')]/text()")
+          print(f"[lxml] headline text: {xpath_headline[0].strip() if xpath_headline else '(not found)'}")
+
+          # XPath の真骨頂: 「class が card な div の中の最初の a タグの href」のような条件抽出
+          sample = "<html><body><div class='card'><a href='http://a.com'>A</a></div><div class='card'><a href='http://b.com'>B</a></div></body></html>"
+          t2 = lxml_html.fromstring(sample)
+          hrefs = t2.xpath("//div[@class='card']/a/@href")
+          print(f"\nXPath で抽出した href 一覧: {hrefs}")
+      except ImportError:
+          print("[lxml] 未インストール — `uv add lxml` でインストールすると XPath が使えます")
+    runnable: true
+    stickman: explain
+    stickman_speech: "BS は書きやすい、lxml は速い。サイト規模で使い分けるのが現場の知恵。"

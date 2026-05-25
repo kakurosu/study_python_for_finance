@@ -114,3 +114,49 @@ pages:
       wrong_hint1: "メソッドは items。"
       wrong_hint2: "`items` だね。"
       wrong_hint3: "答えは `items`。"
+
+  # ─── 参考実装: ティッカー→社名マップと集合演算 ──────────
+  - kind: sample
+    title: "参考実装 — ティッカー辞書と集合演算（リバランス）"
+    markdown: |
+      ## 辞書 = ID → 詳細データのマッピング、集合 = 差分検出
+
+      実務でよくある 2 つのパターン:
+
+      1. **マスター辞書** で「ティッカー → 社名・セクター」を引く
+      2. **集合演算** で「先月の組入銘柄」と「今月の組入銘柄」の差分（売買予定）を出す
+
+      | 集合演算 | 意味 | 金融での例 |
+      |---|---|---|
+      | `A \| B` | 和集合 (どちらか) | 全期間にいた銘柄 |
+      | `A & B` | 積集合 (両方) | 連続組入銘柄 |
+      | `A - B` | 差集合 (A だけ) | **新規組入 (B にない)** |
+      | `B - A` | 差集合 (B だけ) | **除外銘柄 (A にない)** |
+
+      これは **リバランス工程の自動化** で必須のテクニック。
+    sample_code: |
+      # ティッカー → メタデータの辞書
+      master = {
+          "AAPL": {"name": "Apple Inc.",         "sector": "Tech"},
+          "MSFT": {"name": "Microsoft Corp.",    "sector": "Tech"},
+          "GS":   {"name": "Goldman Sachs",      "sector": "Financials"},
+          "JNJ":  {"name": "Johnson & Johnson",  "sector": "Healthcare"},
+          "XOM":  {"name": "Exxon Mobil",        "sector": "Energy"},
+      }
+
+      print("--- 辞書から取り出す ---")
+      for t in ["AAPL", "GS"]:
+          info = master[t]
+          print(f"  {t}: {info['name']} ({info['sector']})")
+
+      # 先月の組入と今月の組入
+      last_month = {"AAPL", "MSFT", "GS", "JNJ"}
+      this_month = {"AAPL", "MSFT", "XOM", "JNJ"}
+
+      print(f"\n両月共通    (持ち越し): {last_month & this_month}")
+      print(f"新規組入 (今月 - 先月): {this_month - last_month}")
+      print(f"除外      (先月 - 今月): {last_month - this_month}")
+      print(f"全期間在籍 (和集合)   : {last_month | this_month}")
+    runnable: true
+    stickman: explain
+    stickman_speech: "辞書と集合は実務で 1 日 100 回使う道具。慣れたら反射的に手が動くようになる。"

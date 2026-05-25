@@ -130,3 +130,103 @@ pages:
       wrong_hint1: "`rp - rb`"
       wrong_hint2: "`rp - rb`"
       wrong_hint3: "`rp - rb`"
+
+  # ─── 参考実装 ①: 相関行列のヒートマップで一望する ──────────
+  - kind: sample
+    title: "参考実装 — 相関行列のヒートマップ"
+    markdown: |
+      ## 6 資産の相関構造を一望する
+
+      実務では 5-20 資産の相関行列を **ヒートマップ** で見るのが定番。
+      色の濃さ = 相関の強さ。**対角は必ず 1.0**、対称行列なので上三角と下三角は同じ。
+
+      **読み方の例**:
+      - 株式同士: 相関 **0.6-0.9** → 同じリスクファクター（市場）に晒されている
+      - 株 vs 債券: **-0.3 〜 +0.3** → 分散効果が出やすい
+      - コモディティ (金など): 他資産と低相関 → ヘッジ資産として組み入れる根拠
+
+      数式: $\rho_{ij} = \dfrac{\mathrm{Cov}(r_i, r_j)}{\sigma_i \sigma_j}$ で常に $-1 \le \rho \le 1$。
+
+      **注意点**: 相関は **線形** な依存しか測れない。非線形（裾依存・テイル相関）は別指標が必要。
+      暴落時には「平時の相関」が崩れて全資産がいっせいに下がる、というのも有名な現象。
+    sample_code: |
+      import pandas as pd
+      import matplotlib.pyplot as plt
+
+      df = pd.read_csv("data/returns_monthly.csv", index_col="YearMonth")
+      corr = df.corr()
+      print(corr.round(2))
+
+      fig, ax = plt.subplots(figsize=(6.5, 5.5))
+      im = ax.imshow(corr, cmap="RdBu_r", vmin=-1, vmax=1)
+      ax.set_xticks(range(len(corr.columns)))
+      ax.set_yticks(range(len(corr.columns)))
+      ax.set_xticklabels(corr.columns, rotation=45, ha="right")
+      ax.set_yticklabels(corr.columns)
+      for i in range(len(corr)):
+          for j in range(len(corr)):
+              v = corr.iloc[i, j]
+              ax.text(j, i, f"{v:.2f}", ha="center", va="center",
+                      color="white" if abs(v) > 0.5 else "black", fontsize=10)
+      fig.colorbar(im, ax=ax, fraction=0.046)
+      ax.set_title("Asset Correlation Matrix (monthly returns)")
+      fig.tight_layout()
+      plt.show()
+    runnable: true
+    stickman: explain
+    stickman_speech: "ヒートマップで一望すると、分散効果のある資産ペアが見えてくる。"
+
+  # ─── 参考実装 ②: 分散共分散とリスク分解 (component contribution) ──
+  - kind: sample
+    title: "参考実装 — ポートフォリオ分散とリスク分解"
+    markdown: |
+      ## 「誰がリスクを持ち込んでいるか」を見る
+
+      ポートフォリオ分散は次の形:
+
+      $$ \sigma_p^2 = \mathbf{w}^\top \Sigma \mathbf{w} $$
+
+      ここから **各資産の限界寄与 (marginal contribution)** と **成分寄与 (component contribution)** を分解できます。
+
+      - 限界寄与: $\mathrm{MCR}_i = \dfrac{\partial \sigma_p}{\partial w_i} = \dfrac{(\Sigma \mathbf{w})_i}{\sigma_p}$
+      - 成分寄与: $\mathrm{CR}_i = w_i \times \mathrm{MCR}_i$、総和は $\sigma_p$ に等しい
+
+      実務での意義:
+      - 「**ウェイトは 5%** だが **リスク寄与は 25%**」のような偏りを発見できる
+      - **リスクパリティ** はこの寄与を全資産で均等化する戦略 (章 20 で扱う)
+      - **Component VaR** という業界標準のリスクモニタの入口
+
+      この Sample は等加重 (1/N) ポートフォリオで分解してみます。
+    sample_code: |
+      import numpy as np
+      import pandas as pd
+
+      df = pd.read_csv("data/returns_monthly.csv", index_col="YearMonth")
+      # 年率の共分散行列
+      cov_ann = df.cov() * 12
+      assets = cov_ann.columns.tolist()
+      n = len(assets)
+
+      # 等加重
+      w = np.ones(n) / n
+      port_var = float(w @ cov_ann.values @ w)
+      port_vol = port_var ** 0.5
+      print(f"Equal-weight portfolio ann. vol = {port_vol:.4f}")
+
+      # リスク分解
+      mcr = (cov_ann.values @ w) / port_vol   # marginal contribution
+      cr  = w * mcr                            # component contribution
+      pct = cr / port_vol * 100
+
+      out = pd.DataFrame({
+          "weight":   np.round(w, 4),
+          "MCR":      np.round(mcr, 4),
+          "Component": np.round(cr, 4),
+          "RiskPct%": np.round(pct, 2),
+      }, index=assets)
+      print(out)
+      print(f"sum(Component) = {cr.sum():.4f}  (== port_vol = {port_vol:.4f})")
+    runnable: true
+    expected_output: "Equal-weight"
+    stickman: explain
+    stickman_speech: "ウェイトとリスク寄与は別物。ここを意識するとリスク管理の解像度が上がる。"

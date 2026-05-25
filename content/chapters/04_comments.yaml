@@ -126,3 +126,71 @@ pages:
       wrong_hint1: "クォートで囲んだ文字列を 1 行目に書こう。"
       wrong_hint2: '`"日次リターンを年率換算する"` だね。'
       wrong_hint3: '答えは `"日次リターンを年率換算する"`。'
+
+  # ─── 参考実装: Google スタイル docstring ────────────────
+  - kind: sample
+    title: "参考実装 — Google スタイル docstring の業界標準"
+    markdown: |
+      ## 業界で 3 大スタイル、その中で最も読みやすい Google スタイル
+
+      Python のコメントは `#`、関数の説明は **docstring** (`"""..."""`) を使います。
+      docstring の書き方には 3 流派があり、Google スタイルが最も読みやすいとされ
+      Google・py4fi2nd・FastAPI などが採用。
+
+      | スタイル | 例 |
+      |---|---|
+      | Google | `Args:` / `Returns:` / `Raises:` を見出しに |
+      | NumPy | アンダーラインでセクション区切り |
+      | reST (Sphinx) | `:param x:` / `:returns:` のフィールド形式 |
+
+      **Google スタイルの基本構造**:
+
+      ```python
+      def f(x: int, y: int) -> int:
+          \"\"\"1 行のサマリ (動詞で始める)。
+
+          残りの説明をここに。
+
+          Args:
+              x: 第一引数の意味。
+              y: 第二引数の意味。
+
+          Returns:
+              戻り値の意味。
+
+          Raises:
+              ValueError: x が負のとき。
+          \"\"\"
+      ```
+
+      `help(関数名)` で表示される + Sphinx で API ドキュメント自動生成も可能。
+    sample_code: |
+      def annualised_return(monthly_return: float, periods: int = 12) -> float:
+          """月次リターンを年率換算する。
+
+          連続複利ではなく単純倍率（独立同分布前提）で年率化する標準的な形。
+
+          Args:
+              monthly_return: 月次の平均リターン（例: 0.01 = 月 1%）。
+              periods: 1 年あたりの観測数。月次なら 12、四半期次なら 4。
+
+          Returns:
+              年率換算したリターン（例: 0.1268 = 年 12.68%）。
+
+          Raises:
+              ValueError: monthly_return が -1 以下のとき (元本割れ過剰)。
+
+          Examples:
+              >>> annualised_return(0.01)
+              0.12682503013196977
+          """
+          if monthly_return <= -1.0:
+              raise ValueError("monthly_return must be > -1")
+          return (1 + monthly_return) ** periods - 1
+
+      # help() で表示
+      help(annualised_return)
+      print(f"\n月 1% の年率 = {annualised_return(0.01) * 100:.2f}%")
+    runnable: true
+    stickman: explain
+    stickman_speech: "Google スタイルで書いておけば、後で自分が読み返すときも他人が読むときも迷わない。"

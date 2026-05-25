@@ -126,3 +126,100 @@ pages:
       wrong_hint1: "サマリ統計の名前。"
       wrong_hint2: "`describe`"
       wrong_hint3: "`describe`"
+
+  # ─── ⑥ 参考実装: loc / iloc / at / query の使い分け ────────────
+  - kind: sample
+    title: "参考実装 — loc / iloc / at / query の使い分け表"
+    markdown: |
+      ## 4 つのアクセサ、業界での使い分け
+
+      pandas で「行と列を抜き出す」方法は 4 つあり、初学者が最も混乱する点です。
+      **役割が違うので使い分けが必要**。
+
+      | アクセサ | 指定方法 | 主な用途 | 速さ |
+      |---|---|---|---|
+      | `df.loc[i, c]` | **ラベル**（行 index 値・列名） | 範囲指定・条件指定 | 普通 |
+      | `df.iloc[i, c]` | **整数位置** (0 始まり) | 順序ベースの処理 | 普通 |
+      | `df.at[i, c]`  | ラベル（**単一セル**だけ） | 1 要素の高速読み書き | **最速** |
+      | `df.query("expr")` | **文字列の条件式** | 複雑な条件フィルタ | 可読性◎ |
+
+      **業界の経験則**:
+      - 単一セル → `at`、複数セル → `loc`
+      - 「上から N 行」「ランダムに 100 行」など順序系 → `iloc`
+      - 条件が 2 つ以上 → `query` (`df[(df.A>0) & (df.B<5)]` より読みやすい)
+
+      **ありがちな失敗**: `df[0:3]` は行 0-2、`df.loc[0:3]` は **行 0-3 (両端含む)**。`loc` は半開区間ではないので注意。
+    sample_code: |
+      import pandas as pd
+
+      df = pd.read_csv("data/stocks_daily.csv", parse_dates=["date"]).set_index("date")
+      print("--- df.loc (ラベル範囲) ---")
+      print(df.loc["2023-01-02":"2023-01-06", ["AAPL_jp", "TOPIX"]])
+
+      print("\n--- df.iloc (整数位置) ---")
+      print(df.iloc[:3, :2])
+
+      print("\n--- df.at (単一セル・最速) ---")
+      print("AAPL_jp on 2023-01-02:", df.at[pd.Timestamp("2023-01-02"), "AAPL_jp"])
+
+      print("\n--- df.query (条件式) ---")
+      hot = df.query("AAPL_jp > 100 and TOPIX > 100")
+      print(f"両方 100 超の日数: {len(hot)} / {len(df)}")
+    runnable: true
+    expected_output: "AAPL_jp on 2023-01-02"
+    stickman: explain
+    stickman_speech: "用途で使い分ける。実務では query が一番読みやすい場面が多いよ。"
+
+  # ─── ⑦ 参考実装: method chaining で読み込み→集計を 1 行 ──────
+  - kind: sample
+    title: "参考実装 — method chaining (読込→pct_change→describe)"
+    markdown: |
+      ## pandas の真骨頂: メソッドチェーン
+
+      pandas は **戻り値が DataFrame / Series** なので、メソッドを連結して
+      「データの加工パイプライン」を 1 つの式で書けます (py4fi2nd でも頻出スタイル)。
+
+      ```
+      pd.read_csv(...)      # ① 読み込み
+        .set_index(...)     # ② インデックス設定
+        .pct_change()       # ③ 日次リターン
+        .dropna()           # ④ 最初の NaN を削除
+        .describe()         # ⑤ 統計サマリ
+        .round(4)           # ⑥ 表示桁数
+      ```
+
+      **メリット**:
+      - 中間変数を作らないので **メモリと名前空間を汚さない**
+      - 読み手に「データの流れ」が伝わる
+      - デバッグ時は途中で `.pipe(print)` を挟むだけ
+
+      **注意点**:
+      - 行が長くなりすぎる → 各メソッドを別行にして括弧で囲む (`(\n  .a()\n  .b()\n)`)
+      - ステップ数が 6 を超えるなら **関数化** を検討
+    sample_code: |
+      import pandas as pd
+
+      summary = (
+          pd.read_csv("data/stocks_daily.csv", parse_dates=["date"])
+            .set_index("date")
+            .pct_change()
+            .dropna()
+            .describe()
+            .round(4)
+      )
+      print(summary)
+
+      # 中間結果が見たければ pipe で覗ける
+      annual_vol = (
+          pd.read_csv("data/stocks_daily.csv", parse_dates=["date"])
+            .set_index("date")
+            .pct_change()
+            .dropna()
+            .std()
+            * (252 ** 0.5)
+      )
+      print("\n年率ボラ:")
+      print(annual_vol.round(3))
+    runnable: true
+    stickman: explain
+    stickman_speech: "メソッドチェーンは pandas の文化。慣れると一行で多くを語れるよ。"

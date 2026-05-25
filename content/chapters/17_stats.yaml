@@ -139,3 +139,46 @@ pages:
       wrong_hint1: "`r` と `(ar, av)`。"
       wrong_hint2: "`r` と `(ar, av)`。"
       wrong_hint3: "`r` と `(ar, av)`。"
+
+  # ─── 参考実装: fund_returns で 4 ファンド年率 μ / σ テーブル ──
+  - kind: sample
+    title: "参考実装 — 4 ファンドの年率リターン / ボラ サマリ"
+    markdown: |
+      ## 月次リターンから年率指標を出す定型
+
+      実務でファンドを評価するとき、最初に作る一覧表は以下の 4 つ:
+
+      | 指標 | 計算 | 意味 |
+      |---|---|---|
+      | 年率リターン $\mu$ | 月次平均 × 12 | 期待リターン |
+      | 年率ボラ $\sigma$ | 月次 std × $\sqrt{12}$ | リスク |
+      | 観測数 N | 月数 | サンプルサイズ |
+      | 最大 / 最小月次 | min / max | テールリスクの簡易確認 |
+
+      **なぜ √12 で年率化する?**: 独立同分布の仮定下では分散が線形加算、つまり
+      $\sigma_{\text{annual}}^2 = 12 \cdot \sigma_{\text{monthly}}^2$。両辺を平方根すると
+      $\sigma_{\text{annual}} = \sigma_{\text{monthly}} \sqrt{12}$。
+
+      ボラの年率化に √ が要るのは、リターンの加算ではなく **分散の加算** に由来。
+      これを「平均は時間で増える / リスクは時間の平方根で増える」と覚える。
+    sample_code: |
+      import pandas as pd
+
+      df = pd.read_csv("data/fund_returns.csv", parse_dates=["YearMonth"])
+      df = df.set_index("YearMonth")
+      # ファンド名 (Bench 列を除いた他列)
+      funds = [c for c in df.columns if c != "Bench"]
+
+      out = pd.DataFrame(index=funds)
+      out["N (months)"] = df[funds].count().values
+      out["MeanMonthly%"] = (df[funds].mean() * 100).round(3).values
+      out["VolMonthly%"]  = (df[funds].std()  * 100).round(3).values
+      out["MeanAnnual%"]  = (df[funds].mean() * 12 * 100).round(2).values
+      out["VolAnnual%"]   = (df[funds].std()  * (12 ** 0.5) * 100).round(2).values
+      out["Min%"]         = (df[funds].min() * 100).round(2).values
+      out["Max%"]         = (df[funds].max() * 100).round(2).values
+
+      print(out)
+    runnable: true
+    stickman: explain
+    stickman_speech: "μ と σ、それぞれ年率に揃えて並べるとファンド比較がはじめて意味を持つ。"

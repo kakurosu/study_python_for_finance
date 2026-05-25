@@ -116,3 +116,50 @@ pages:
       wrong_hint1: "末尾に追加 = append。"
       wrong_hint2: "`append` だね。"
       wrong_hint3: "答えは `append`。"
+
+  # ─── 参考実装: ポートフォリオ重みリストの正規化 ──────────
+  - kind: sample
+    title: "参考実装 — リストでポートフォリオ重みを正規化"
+    markdown: |
+      ## 「合計を 1.0 にする」が最初の処理
+
+      ポートフォリオ最適化や許容ウェイトの調整で、**重みを 1 にスケール** する作業は頻出。
+      リストの基本操作 (合計、内包、スライス) だけで書けます。
+
+      **典型的な状況**:
+      - アナリストが「AAPL 30, MSFT 25, GOOG 25, AMZN 20」と言ったら
+        合計 100 → 各値 / 100 で正規化
+      - 「上位 5 銘柄だけに集中」したいなら、`sorted` + スライス + 再正規化
+      - 「マイナス重み (= 空売り)」を許すかどうかは戦略次第 (ロングオンリーなら絶対値→正規化)
+
+      **業界の小ネタ**:
+      - SUM != 1 のまま渡すと最適化ライブラリがエラーや誤動作
+      - 浮動小数点誤差で 0.99999... になることもあり、`assert abs(sum-1) < 1e-9` で確認
+      - tuple は **immutable** なので「確定したポート」を保存するのに向く
+    sample_code: |
+      raw = [30.0, 25.0, 25.0, 20.0, 10.0, 5.0]   # 合計 115 (1 に揃ってない)
+      tickers = ["AAPL", "MSFT", "GOOG", "AMZN", "META", "NVDA"]
+
+      # 1) 単純正規化
+      total = sum(raw)
+      weights = [r / total for r in raw]
+      print(f"正規化前合計: {total},  正規化後合計: {sum(weights):.6f}")
+      for t, w in zip(tickers, weights):
+          print(f"  {t}: {w*100:5.2f}%")
+
+      # 2) 上位 N 銘柄だけに集中して再正規化
+      N = 3
+      pairs = sorted(zip(tickers, weights), key=lambda p: -p[1])[:N]
+      top_tickers, top_w = zip(*pairs)
+      total2 = sum(top_w)
+      concentrated = [w / total2 for w in top_w]
+      print(f"\n上位 {N} 銘柄に集中:")
+      for t, w in zip(top_tickers, concentrated):
+          print(f"  {t}: {w*100:5.2f}%")
+
+      # 3) 確定ポートを tuple で保存 (immutable = 後から間違って書き換えない)
+      final_portfolio = tuple(zip(top_tickers, concentrated))
+      print(f"\n確定ポート (tuple): {final_portfolio}")
+    runnable: true
+    stickman: explain
+    stickman_speech: "リストは「途中で形が変わる作業中の入れ物」、tuple は「確定したものを置く金庫」。"

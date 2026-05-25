@@ -120,3 +120,97 @@ pages:
       wrong_hint1: "散布図関数の名前。"
       wrong_hint2: "`scatter`"
       wrong_hint3: "`scatter`"
+
+  # ─── 参考実装 ①: Figure / Axes オブジェクト指向 API ─────────
+  - kind: sample
+    title: "参考実装 — Figure/Axes 指向 API（業界標準）"
+    markdown: |
+      ## なぜ `plt.plot()` ではなく `ax.plot()` を使うのか
+
+      `plt.plot(...)` は **暗黙の現在の Axes** に描画する MATLAB 流のスタイル。
+      手軽だが、**Sub-plot や複数 Figure を扱うときに「どこに描いているか」が曖昧** に。
+
+      業界標準（py4fi2nd / matplotlib 公式）は **明示的に Figure と Axes を取り出す**:
+
+      ```python
+      fig, ax = plt.subplots()   # 1 Figure・1 Axes
+      ax.plot(x, y)              # 「ax に描く」と明示
+      ax.set_xlabel("...")       # 軸ラベルも ax 経由
+      ```
+
+      | スタイル | 例 | 適している場面 |
+      |---|---|---|
+      | **pyplot 状態** | `plt.plot()` `plt.title()` | Jupyter 即興・1 枚プロット |
+      | **OO (Axes 指向)** | `fig, ax = plt.subplots()` `ax.plot()` | アプリ・ライブラリ・複数軸 |
+
+      **覚え方**: `ax.set_xlabel(...)` ↔ `plt.xlabel(...)` の対応。set_ プレフィックスが付く。
+    sample_code: |
+      import pandas as pd
+      import matplotlib.pyplot as plt
+
+      df = pd.read_csv("data/stocks_daily.csv", parse_dates=["date"]).set_index("date")
+      fig, ax = plt.subplots(figsize=(8, 4))
+      ax.plot(df.index, df["AAPL_jp"], label="AAPL_jp", linewidth=1.5)
+      ax.plot(df.index, df["MSFT_jp"], label="MSFT_jp", linewidth=1.5)
+      ax.set_title("Stock Prices (synthetic)")
+      ax.set_xlabel("Date")
+      ax.set_ylabel("Price")
+      ax.legend(loc="upper left")
+      ax.grid(True, alpha=0.3)
+      fig.tight_layout()
+      plt.show()
+    runnable: true
+    stickman: explain
+    stickman_speech: "fig, ax = plt.subplots() が業界の合言葉。Jupyter でも本番でも通用するスタイル。"
+
+  # ─── 参考実装 ②: 2x2 サブプロットで多角的に可視化 ──────────
+  - kind: sample
+    title: "参考実装 — 2x2 サブプロット（価格・リターン・分布・QQ）"
+    markdown: |
+      ## 1 銘柄を 4 つの視点で見る
+
+      実務では **同じデータを違う角度から並べて見る** ことで異常を発見します。
+      `plt.subplots(2, 2)` は **2 行 2 列** の Axes 配列を返し、`ax[i, j]` で個別アクセス。
+
+      この Sample は AAPL_jp の 2 年間データを以下で可視化:
+
+      1. **時系列**: 価格そのものの推移（トレンド・ドリフトを見る）
+      2. **日次リターン**: ボラティリティの時間構造（クラスタリング）
+      3. **ヒストグラム**: リターン分布（左右の裾の重さ）
+      4. **QQ プロット**: 正規性の検証（直線から外れる → 裾が重い）
+
+      これは Eryk Lewinson『Python for Finance Cookbook』Ch.3 の定型レイアウト。
+      投資・リスク部門のリサーチでも頻出する基本テンプレートです。
+    sample_code: |
+      import pandas as pd
+      import numpy as np
+      import matplotlib.pyplot as plt
+      from scipy import stats
+
+      px = pd.read_csv("data/stocks_daily.csv", parse_dates=["date"]).set_index("date")["AAPL_jp"]
+      ret = px.pct_change().dropna()
+
+      fig, axes = plt.subplots(2, 2, figsize=(10, 7))
+      # ① 価格時系列
+      axes[0, 0].plot(px.index, px.values, color="#1f77b4")
+      axes[0, 0].set_title("Price")
+      axes[0, 0].grid(True, alpha=0.3)
+      # ② 日次リターン
+      axes[0, 1].plot(ret.index, ret.values, color="#ff7f0e", linewidth=0.6)
+      axes[0, 1].set_title("Daily Returns")
+      axes[0, 1].axhline(0, color="black", linewidth=0.5)
+      axes[0, 1].grid(True, alpha=0.3)
+      # ③ ヒストグラム
+      axes[1, 0].hist(ret.values, bins=40, color="#2ca02c", alpha=0.7, edgecolor="black")
+      axes[1, 0].set_title(f"Return Histogram (mean={ret.mean():.4f}, std={ret.std():.4f})")
+      # ④ QQ プロット
+      stats.probplot(ret.values, dist="norm", plot=axes[1, 1])
+      axes[1, 1].set_title("QQ Plot vs Normal")
+      axes[1, 1].grid(True, alpha=0.3)
+
+      fig.suptitle("AAPL_jp — Multi-angle View", fontsize=13)
+      fig.tight_layout()
+      plt.show()
+    runnable: true
+    stickman: explain
+    stickman_speech: "同じデータを 4 視点で見ると、見えなかったクセが見えてくる。リスク管理の基本だよ。"

@@ -119,3 +119,52 @@ pages:
       wrong_hint1: "`alpha / te`"
       wrong_hint2: "`alpha / te`"
       wrong_hint3: "`alpha / te`"
+
+  # ─── 参考実装: 4 ファンドの SR / IR ランキング ───────────
+  - kind: sample
+    title: "参考実装 — Sharpe / Information Ratio ランキング"
+    markdown: |
+      ## 「リスク調整後リターン」で並べ直す
+
+      生のリターンで並べると「リスクを取った分の上振れ」を見落とす。
+      実務では **Sharpe Ratio (絶対)** と **Information Ratio (対ベンチマーク)** で並べる。
+
+      $$ \text{SR} = \dfrac{\mu_p - r_f}{\sigma_p},\quad \text{IR} = \dfrac{\mu_p - \mu_b}{\sigma(r_p - r_b)} $$
+
+      | 指標 | 何を測るか | 業界の合格ライン |
+      |---|---|---|
+      | SR | リスクフリーを上回るリターン / 全リスク | > 1.0 良好、> 2.0 優秀 |
+      | IR | ベンチマーク超過 / トラッキングエラー | > 0.5 良好、> 1.0 優秀 |
+
+      **注意**: SR は無リスク資産を想定するので **株式 100% 戦略には IR が適切**。
+      混同するとパッシブとアクティブを区別できない。
+
+      この Sample は `fund_returns.csv` の 4 ファンド + Bench で両指標を並べます。
+    sample_code: |
+      import pandas as pd
+
+      df = pd.read_csv("data/fund_returns.csv", parse_dates=["YearMonth"]).set_index("YearMonth")
+      funds = [c for c in df.columns if c != "Bench"]
+      rf_monthly = 0.001  # 仮定: 月次無リスクレート 0.1%
+
+      rows = []
+      for f in funds:
+          rp = df[f]
+          rb = df["Bench"]
+          excess = rp - rf_monthly
+          active = rp - rb
+          sr = (excess.mean() * 12) / (excess.std() * (12 ** 0.5))
+          ir = (active.mean() * 12) / (active.std() * (12 ** 0.5))
+          rows.append({"Fund": f, "SR": round(sr, 3), "IR": round(ir, 3),
+                       "MeanAnn%": round(rp.mean() * 12 * 100, 2),
+                       "VolAnn%":  round(rp.std()  * (12 ** 0.5) * 100, 2)})
+      tbl = pd.DataFrame(rows).set_index("Fund")
+      print("--- 元の順 ---")
+      print(tbl)
+      print("\n--- Sharpe で降順 ---")
+      print(tbl.sort_values("SR", ascending=False))
+      print("\n--- Information で降順 (ベンチ対比の優秀度) ---")
+      print(tbl.sort_values("IR", ascending=False))
+    runnable: true
+    stickman: explain
+    stickman_speech: "生リターンの順位と SR / IR の順位が違うことに気付くと、リスク調整の意味が腑に落ちる。"
