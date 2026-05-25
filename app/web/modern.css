@@ -1,0 +1,390 @@
+/* ============================================================
+   Study.Py — Modern overlay
+   ------------------------------------------------------------
+   Layered on top of styles.css. Adds modern touches without
+   rewriting the design language:
+
+     - Animated mesh-gradient backdrop (subtle, GPU-only)
+     - Glassmorphic surfaces (backdrop-filter on chrome/cards)
+     - Smoother focus rings + accessible high-contrast
+     - Refined hover transitions (transform + shadow)
+     - View transitions on route change
+     - Animated kernel-state pill
+   ============================================================ */
+
+/* ---------- Motion tokens ------------------------------------- */
+:root {
+  --shadow-card:        0 1px 0 rgba(255,255,255,0.02) inset, 0 8px 24px -16px rgba(0,0,0,0.7);
+  --shadow-card-hover:  0 1px 0 rgba(255,255,255,0.04) inset, 0 18px 48px -22px rgba(0,0,0,0.85);
+  --ring:               0 0 0 1px var(--accent-tint), 0 0 0 4px var(--accent-soft);
+  --ring-focus:         0 0 0 1px color-mix(in oklab, var(--blue) 75%, transparent), 0 0 0 4px var(--blue-soft);
+}
+
+/* ---------- Background mesh gradient -------------------------- */
+/* A slow-moving radial-gradient haze underneath everything. We
+   keep it cheap (transform: translate3d) so it stays smooth even
+   on integrated GPUs. */
+body.theme-dark::before,
+body:not(.theme-light)::before {
+  content: '';
+  position: fixed;
+  inset: -20vmax;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60vmax 60vmax at 12% 18%,
+                    color-mix(in oklab, var(--accent) 18%, transparent) 0%,
+                    transparent 55%),
+    radial-gradient(70vmax 55vmax at 88% 82%,
+                    color-mix(in oklab, var(--blue) 14%, transparent) 0%,
+                    transparent 55%),
+    radial-gradient(80vmax 60vmax at 50% 110%,
+                    color-mix(in oklab, var(--accent) 8%, transparent) 0%,
+                    transparent 60%);
+  filter: blur(60px) saturate(115%);
+  opacity: 0.55;
+  animation: mesh-drift 28s ease-in-out infinite alternate;
+}
+body.theme-light::before {
+  content: '';
+  position: fixed;
+  inset: -20vmax;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60vmax 60vmax at 10% 20%,
+                    color-mix(in oklab, var(--accent) 10%, transparent) 0%,
+                    transparent 55%),
+    radial-gradient(70vmax 55vmax at 90% 80%,
+                    color-mix(in oklab, var(--blue) 12%, transparent) 0%,
+                    transparent 55%);
+  filter: blur(80px) saturate(110%);
+  opacity: 0.65;
+  animation: mesh-drift 32s ease-in-out infinite alternate;
+}
+@keyframes mesh-drift {
+  0%   { transform: translate3d(0, 0, 0)        scale(1.00); }
+  50%  { transform: translate3d(2vmax, -3vmax, 0) scale(1.04); }
+  100% { transform: translate3d(-2vmax, 2vmax, 0) scale(1.02); }
+}
+
+/* Disable the animated mesh for users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none !important; }
+}
+
+/* ---------- Glass chrome -------------------------------------- */
+.sidebar,
+.topbar,
+.statusbar,
+.chapter__head,
+.test-runner__head {
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+/* Make the sidebar background a touch more vivid so the brand pops */
+.sidebar {
+  background:
+    linear-gradient(180deg,
+                    color-mix(in oklab, var(--surface) 78%, transparent) 0%,
+                    color-mix(in oklab, var(--bg-1) 78%, transparent) 100%);
+  border-right: 1px solid color-mix(in oklab, var(--line-2) 80%, transparent);
+}
+
+/* Topbar — frosted glass with hairline separator */
+.topbar {
+  background: color-mix(in oklab, var(--chrome) 92%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--line-2) 85%, transparent);
+}
+
+/* Statusbar — same glass treatment */
+.statusbar {
+  background: color-mix(in oklab, var(--chrome) 92%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--line-2) 85%, transparent);
+}
+
+/* ---------- Modern card surface ------------------------------- */
+.card,
+.continue,
+.test-card,
+.practice-item,
+.history__item,
+.settings-section,
+.modal__panel,
+.palette__panel,
+.help__panel {
+  background:
+    linear-gradient(180deg,
+                    color-mix(in oklab, var(--surface) 92%, transparent) 0%,
+                    color-mix(in oklab, var(--surface-2) 92%, transparent) 100%);
+  border: 1px solid color-mix(in oklab, var(--line-2) 80%, transparent);
+  box-shadow: var(--shadow-card);
+  transition: transform var(--dur-2) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out),
+              border-color var(--dur-1) var(--ease-out);
+}
+
+.card:hover,
+.test-card:hover,
+.practice-item:hover,
+.history__item:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: color-mix(in oklab, var(--accent) 35%, var(--line-2));
+}
+
+/* Continue (hero) card — slightly stronger emphasis */
+.continue {
+  position: relative;
+  overflow: hidden;
+}
+.continue::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 80% at 100% 0%,
+                    color-mix(in oklab, var(--accent) 18%, transparent) 0%,
+                    transparent 60%);
+  opacity: 0.7;
+}
+
+/* ---------- Buttons — refined motion -------------------------- */
+.btn {
+  transition:
+    transform var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out),
+    background var(--dur-1) var(--ease-out),
+    color      var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out);
+  will-change: transform;
+}
+.btn:active {
+  transform: translateY(1px) scale(0.99);
+}
+.btn--primary {
+  background: linear-gradient(180deg,
+                              color-mix(in oklab, var(--accent) 100%, white 0%) 0%,
+                              color-mix(in oklab, var(--accent) 88%, black 12%) 100%);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.12) inset,
+              0 10px 24px -10px var(--accent-glow);
+}
+.btn--primary:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.18) inset,
+              0 14px 32px -10px var(--accent-glow);
+  transform: translateY(-1px);
+}
+.btn--ghost:hover {
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--line-2));
+  background: color-mix(in oklab, var(--accent) 6%, transparent);
+}
+
+/* ---------- Focus rings --------------------------------------- */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+  border-radius: 2px;
+}
+
+/* ---------- Nav items ----------------------------------------- */
+.nav__item {
+  position: relative;
+  transition: color var(--dur-1) var(--ease-out),
+              background var(--dur-1) var(--ease-out);
+}
+.nav__item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 6px; bottom: 6px;
+  width: 2px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform var(--dur-2) var(--ease-out);
+  border-radius: 1px;
+}
+.nav__item.is-active::before { transform: scaleY(1); }
+.nav__item:hover {
+  background: color-mix(in oklab, var(--accent) 5%, transparent);
+}
+
+/* ---------- Kernel pill --------------------------------------- */
+.kernel-pill {
+  position: relative;
+  transition: background var(--dur-1) var(--ease-out),
+              border-color var(--dur-1) var(--ease-out);
+}
+.kernel-pill .dot {
+  position: relative;
+}
+.kernel-pill[data-state="ready"]    .dot { background: var(--ok); }
+.kernel-pill[data-state="busy"]     .dot { background: var(--warn); }
+.kernel-pill[data-state="error"]    .dot { background: var(--accent); }
+.kernel-pill[data-state="starting"] .dot { background: var(--blue); }
+
+/* Soft halo around the indicator that pulses when busy/starting */
+.kernel-pill[data-state="busy"]    .dot::after,
+.kernel-pill[data-state="starting"].dot::after,
+.kernel-pill[data-state="busy"]    .dot::before,
+.kernel-pill[data-state="starting"] .dot::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.0;
+  animation: pulse 1.6s ease-out infinite;
+}
+@keyframes pulse {
+  0%   { opacity: 0.45; transform: scale(1);   }
+  100% { opacity: 0;    transform: scale(2.5); }
+}
+
+/* ---------- View transitions ---------------------------------- */
+.view {
+  transition: opacity var(--dur-3) var(--ease-out),
+              transform var(--dur-3) var(--ease-out);
+}
+.view:not(.is-active) {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+.view.is-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ---------- Hero typography polish ---------------------------- */
+.hero__title {
+  background: linear-gradient(135deg, var(--hero-grad-1) 0%, var(--hero-grad-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Tag refinement ------------------------------------ */
+.tag {
+  transition: background var(--dur-1) var(--ease-out),
+              color var(--dur-1) var(--ease-out),
+              border-color var(--dur-1) var(--ease-out);
+}
+.tag--accent {
+  background: linear-gradient(180deg,
+                              color-mix(in oklab, var(--accent) 22%, transparent),
+                              color-mix(in oklab, var(--accent) 14%, transparent));
+  border-color: color-mix(in oklab, var(--accent) 45%, transparent);
+  color: color-mix(in oklab, var(--accent) 85%, var(--ink));
+}
+
+/* ---------- Code surfaces ------------------------------------- */
+.codecard, pre.codecard {
+  background:
+    linear-gradient(180deg,
+                    color-mix(in oklab, var(--bg-1) 96%, transparent) 0%,
+                    color-mix(in oklab, var(--bg) 96%, transparent) 100%);
+  border: 1px solid color-mix(in oklab, var(--line-2) 70%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02),
+              0 20px 40px -28px rgba(0,0,0,0.8);
+}
+
+/* ---------- Inputs & search ----------------------------------- */
+.search-btn,
+.ref-controls input,
+.palette__search input {
+  transition: border-color var(--dur-1) var(--ease-out),
+              background var(--dur-1) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out);
+}
+.search-btn:hover {
+  border-color: color-mix(in oklab, var(--accent) 35%, var(--line-2));
+  background: color-mix(in oklab, var(--accent) 5%, transparent);
+}
+
+/* ---------- Modal scrim + entrance ---------------------------- */
+.modal:not([hidden]),
+.palette:not([hidden]),
+.help:not([hidden]) {
+  animation: scrim-in var(--dur-2) var(--ease-out);
+}
+.modal:not([hidden]) .modal__panel,
+.palette:not([hidden]) .palette__panel,
+.help:not([hidden]) .help__panel {
+  animation: panel-in var(--dur-3) var(--ease-out);
+}
+@keyframes scrim-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);     }
+}
+
+/* ---------- Statusbar dot pulse ------------------------------- */
+.statusbar .dot.is-success {
+  position: relative;
+}
+.statusbar .dot.is-success::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: var(--ok);
+  opacity: 0;
+  animation: pulse 2.4s ease-out infinite;
+}
+
+/* ---------- Mascot polish ------------------------------------- */
+.mascot__avatar {
+  position: relative;
+}
+.mascot__avatar::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side,
+                    color-mix(in oklab, var(--accent) 22%, transparent) 0%,
+                    transparent 70%);
+  z-index: -1;
+}
+
+/* ---------- Scrollbar (subtle) -------------------------------- */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--line-3) 70%, transparent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--accent) 35%, var(--line-3));
+  background-clip: padding-box;
+}
+
+/* ---------- Light theme nudges -------------------------------- */
+body.theme-light .card,
+body.theme-light .continue,
+body.theme-light .test-card,
+body.theme-light .practice-item,
+body.theme-light .history__item,
+body.theme-light .settings-section {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 10px 30px -16px rgba(15,23,42,0.18);
+}
+body.theme-light .card:hover,
+body.theme-light .test-card:hover,
+body.theme-light .practice-item:hover,
+body.theme-light .history__item:hover {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.7) inset,
+    0 18px 44px -18px rgba(15,23,42,0.26);
+}
