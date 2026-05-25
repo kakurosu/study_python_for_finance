@@ -11,6 +11,16 @@ pages:
 - kind: reading
   title: ARIMA モデルの構築（章 23 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `ARIMA(series, order=(p, d, q))` の `order` は **AR 次数 p / 差分階数 d / MA 次数 q**。
+    - 例: `(1, 1, 1)` は「1 階差分を取った系列に AR(1) と MA(1) を当てる」。
+    - 株価のように非定常な系列は `d=1` で差分を取ってから当てるのが定石。
+
+    **読み方**: `order` のタプル 3 要素を **p, d, q の順** で読む。
+
+    ---
+
     下のコードが構築しているのはどんなモデルですか？
   code: |
     from statsmodels.tsa.arima.model import ARIMA
@@ -31,6 +41,16 @@ pages:
 - kind: reading
   title: リターン系列の生成（章 23 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `Series.pct_change()` は **前期からの変化率** $\dfrac{P_t - P_{t-1}}{P_{t-1}} = \dfrac{P_t}{P_{t-1}} - 1$。
+    - 1 行目は前期がないので `NaN`。`.dropna()` で除外するのが定型。
+    - 「価格 → リターン」変換の最頻出メソッド。
+
+    **読み方**: 各時点の値を「前の値で割って 1 を引く」と紙で計算してみる。
+
+    ---
+
     下のコードが計算しているのは何ですか？
   code: |
     import pandas as pd
@@ -52,6 +72,16 @@ pages:
 - kind: reading
   title: 線形回帰の学習（章 24 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - scikit-learn の最頻出パターン: `model.fit(X, y)` → `model.predict(X)`。
+    - `fit` が学習、`predict` が予測。すべてのモデル (LinearRegression / RandomForest / etc.) で **共通 API**。
+    - 結果は学習データに対する予測値の配列。
+
+    **読み方**: 「学習 → 予測」の 2 ステップ、と覚える。
+
+    ---
+
     下のコードを読んで、`coef_` が表すものとして正しいものを選んでください。
   code: |
     from sklearn.linear_model import LinearRegression
@@ -73,6 +103,16 @@ pages:
 - kind: reading
   title: データ分割（章 24 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `train_test_split(X, y, test_size=0.2, random_state=42)` で **訓練・テスト分割**。
+    - `test_size=0.2` → テスト 20%, 訓練 80%。`random_state` で再現可能に。
+    - 返り値の順序は **X_train, X_test, y_train, y_test** (混同注意)。
+
+    **読み方**: 戻り値 4 つを左から「特徴量訓練, 特徴量テスト, 目的変数訓練, 目的変数テスト」と当てる。
+
+    ---
+
     下のコードについて、`X_test` の役割として正しいものを選んでください。
   code: |
     from sklearn.model_selection import train_test_split
@@ -94,6 +134,15 @@ pages:
 - kind: reading
   title: 学習ステップの流れ（章 25 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - PyTorch 学習ループの **4 ステップ**: ① `pred = model(X)` (forward) → ② `loss = loss_fn(pred, y)` → ③ `loss.backward()` (勾配計算) → ④ `optimizer.step()` (パラメータ更新)。
+    - この順序が定型。`zero_grad()` を ① の前に挟むのも定石。
+
+    **読み方**: 4 行が **forward → loss → backward → step** の順になっているか確認。
+
+    ---
+
     下のコードについて、`optimizer.step()` が行うこととして正しいものを選んでください。
   code: |
     import torch
@@ -117,6 +166,16 @@ pages:
 - kind: reading
   title: ニューラルネットの構造（章 25 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `nn.Sequential(...)` は **層を順に並べる** だけのコンテナ。前の層の出力が次の入力。
+    - `nn.Linear(in, out)` は全結合層 (重み W と バイアス b)。
+    - 活性化関数 (`nn.ReLU()` 等) は層と層の間に挟む。
+
+    **読み方**: 各層の `in/out` 次元を追って、配列の形が整合しているか確認。
+
+    ---
+
     下のコードが定義するモデルとして正しいものを選んでください。
   code: |
     import torch.nn as nn

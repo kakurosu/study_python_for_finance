@@ -10,6 +10,16 @@ pages:
 - kind: reading
   title: Streamlit でテキスト表示（章 30 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - Streamlit は **Python スクリプトをそのまま Web アプリ化** するフレームワーク。
+    - `st.title(...)` で見出し、`st.write(...)` で任意のオブジェクト (文字列・DataFrame・図) を描画。
+    - 起動は `streamlit run script.py`。ファイル保存で自動リロード。
+
+    **読み方**: `st.xxx(...)` 1 行 = ブラウザ上の 1 要素、と対応付け。
+
+    ---
+
     下のコードが画面に表示するものとして正しいものを選んでください。
   code: |
     import streamlit as st
@@ -30,6 +40,16 @@ pages:
 - kind: reading
   title: Streamlit のスライダー（章 30 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `st.slider(label, min, max, default)` は **ユーザーが現在選んでいる値そのもの** を返す。
+    - 範囲を float で渡すと戻り値も float、int で渡すと int。
+    - スライダーが動くたびにスクリプト全体が再実行される (Streamlit の再実行モデル)。
+
+    **読み方**: 戻り値は **その時点で選択中の値**、と直感的に。
+
+    ---
+
     下のコードについて、`risk_free` の型として正しいものを選んでください。
   code: |
     import streamlit as st
@@ -49,6 +69,16 @@ pages:
 - kind: reading
   title: マウス操作の自動化（章 31 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `pyautogui.moveTo(x, y, duration=t)` は **マウスカーソルを (x, y) へ t 秒かけて移動** する関数。
+    - 座標は画面の左上が (0, 0)。`duration=0` で瞬間移動。
+    - 暴走対策: `pyautogui.FAILSAFE = True` (画面左上にカーソルを動かすと例外で停止)。
+
+    **読み方**: 関数名 `moveTo` を見たら **絶対座標への移動**、と判定。
+
+    ---
+
     下のコードが行うこととして正しいものを選んでください。
   code: |
     import pyautogui
@@ -69,6 +99,16 @@ pages:
 - kind: reading
   title: Playwright でページ取得（章 31 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - Playwright は **ブラウザを Python から操作** するライブラリ。`with sync_playwright()` でリソース管理。
+    - `p.chromium.launch(headless=True)` で Chromium を **画面非表示** で起動 (バッチ用)。
+    - `page.goto(url)` でアクセス、`page.content()` で HTML 取得、`page.close()` / `browser.close()` で終了。
+
+    **読み方**: with ブロック内で browser → page → 操作 → close、の流れを追う。
+
+    ---
+
     下のコードが取得しているものとして正しいものを選んでください。
   code: |
     from playwright.sync_api import sync_playwright

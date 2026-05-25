@@ -10,6 +10,16 @@ pages:
 - kind: reading
   title: HTTP GET の取得（章 27 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `requests.get(url)` で **HTTP GET リクエスト** を送信。`Response` オブジェクトが返る。
+    - `response.text` は **本文を str で**、`response.content` は **バイト列で** 返す。
+    - ステータスコードは `response.status_code` (200 = OK)。
+
+    **読み方**: `.text` と `.content` の違い (str か bytes か) を意識して読む。
+
+    ---
+
     下のコードについて、`html` の中身として正しいものを選んでください。
   code: |
     import requests
@@ -30,6 +40,16 @@ pages:
 - kind: reading
   title: リンク抽出（章 27 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `BeautifulSoup(html, "html.parser")` で HTML をパース。
+    - `soup.find_all("a")` で **全 `<a>` 要素** を取得 (list で返る)。
+    - 各要素から `a.get("href")` で href 属性を取り出す。
+
+    **読み方**: 「全 a タグを集めて、各 href を取り出す」というスクレイピングの定型と読む。
+
+    ---
+
     下のコードが取得しているものとして正しいものを選んでください。
   code: |
     from bs4 import BeautifulSoup
@@ -50,6 +70,16 @@ pages:
 - kind: reading
   title: OpenAI SDK の認証（章 28 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `OpenAI()` のインスタンス化は **引数省略可**。その場合は環境変数 `OPENAI_API_KEY` が自動的に使われる。
+    - 明示するなら `OpenAI(api_key="sk-...")` だが、コードに直書きはセキュリティ事故の元。
+    - API キーは `.env` ファイルや OS の環境変数で管理するのが業界標準。
+
+    **読み方**: 引数省略 ≈ 環境変数を読む、と理解。
+
+    ---
+
     下のコードについて、`OpenAI()` が API キーをどこから取るか正しいものを選んでください。
   code: |
     from openai import OpenAI
@@ -69,6 +99,16 @@ pages:
 - kind: reading
   title: OpenAI Chat Completions の構造（章 28 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `client.chat.completions.create(model=..., messages=[...])` が Chat 系の **基本呼び出し形式**。
+    - `messages` は dict のリスト。各 dict は `{"role": "system"/"user"/"assistant", "content": "..."}`。
+    - 戻り値の `response.choices[0].message.content` に応答テキストが入る。
+
+    **読み方**: messages の role と content を 1 ペアずつ確認、応答の取り出しパスを辿る。
+
+    ---
+
     下のコードについて、`messages` パラメータの構造として正しいものを選んでください。
   code: |
     response = client.chat.completions.create(

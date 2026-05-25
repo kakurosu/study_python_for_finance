@@ -13,6 +13,16 @@ pages:
 - kind: reading
   title: NumPy ブロードキャスト（章 12 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - NumPy 配列にスカラーを掛けると **各要素にブロードキャスト** で適用される (`np.array([1,2,3]) * 10 == [10,20,30]`)。
+    - 同じ計算を `for` ループで書くより圧倒的に速い。
+    - ブロードキャストは「形が違う配列同士でも自動でサイズを合わせる」ルール。
+
+    **読み方**: 配列とスカラーを掛けたら **各要素にスカラーが掛かる** とイメージ。
+
+    ---
+
     下のコードの出力として正しいものを選んでください。
   code: |
     import numpy as np
@@ -33,6 +43,16 @@ pages:
 - kind: reading
   title: NumPy 配列の平均（章 12 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `ndarray.mean()` は **全要素の算術平均** を返す。
+    - 多次元配列で行・列ごとに集計したいときは `axis=0` (列方向) / `axis=1` (行方向) を指定。
+    - `np.mean(arr)` でも同じ結果。
+
+    **読み方**: 要素を全部足して要素数で割る、と紙の上で計算。
+
+    ---
+
     下のコードの出力として正しいものを選んでください。
   code: |
     import numpy as np
@@ -53,6 +73,16 @@ pages:
 - kind: reading
   title: pandas Series のインデックス（章 13 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `pd.Series(data, index=[...])` で **ラベル付き 1 次元配列** を作る。
+    - インデックスはラベルなので `s["a"]` のように文字列でアクセスできる (DataFrame の 1 列分に相当)。
+    - ラベルが整数でも、`s[0]` は **位置** ではなく **ラベル** として解釈される (混乱の元)。
+
+    **読み方**: `index=` で指定したラベルと、それぞれに対応する値のペアを 1 個ずつ確認。
+
+    ---
+
     下のコードの出力として正しいものを選んでください。
   code: |
     import pandas as pd
@@ -73,6 +103,16 @@ pages:
 - kind: reading
   title: DataFrame の列フィルタ（章 13 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - DataFrame は **2 次元の表データ**。`df["col_name"]` で 1 列 (Series) を取り出す。
+    - 条件で行を絞るときは `df[df["col"] > 100]` (boolean indexing) を使う。
+    - 列名と行 index が **両方** あるので、混同しないように。
+
+    **読み方**: `df["..."]` は **列の名前**、`df[条件]` は **行の真偽値**、と区別。
+
+    ---
+
     下のコードを実行すると、何が起きるか正しいものを選んでください。
   code: |
     import pandas as pd
@@ -96,6 +136,16 @@ pages:
 - kind: reading
   title: matplotlib の描画関数（章 14 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - matplotlib の主要関数: `plt.plot` (折れ線)、`plt.bar` (棒)、`plt.scatter` (散布)、`plt.hist` (ヒストグラム)。
+    - 用途で使い分ける: 時系列 → plot、カテゴリ別 → bar、2 変数の関係 → scatter、分布 → hist。
+    - 描画後に `plt.show()` で表示。
+
+    **読み方**: 関数名がそのまま描画タイプ、と覚える。
+
+    ---
+
     下のコードはどんなグラフを描きますか？
   code: |
     import matplotlib.pyplot as plt
@@ -118,6 +168,16 @@ pages:
 - kind: reading
   title: scatter の役割（章 14 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `plt.scatter(x, y)` は **2 つの数値配列の点を打つ** 散布図。各点 (x[i], y[i]) が独立に描画される。
+    - 2 変数の **相関** を視覚化するのに最適。線で繋がない。
+    - 折れ線が良ければ `plt.plot`、棒が良ければ `plt.bar`。
+
+    **読み方**: 「2 つの量の関係」を見たいなら scatter、と判断。
+
+    ---
+
     下のコードの目的として最も近いものを選んでください。
   code: |
     import matplotlib.pyplot as plt
@@ -140,6 +200,16 @@ pages:
 - kind: reading
   title: groupby 集計（章 15 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `df.groupby(col)` は **特定の列の値で行をまとめる** 操作。`.mean()` などで集計する。
+    - SQL の `GROUP BY` と同じ。「カテゴリ別の平均」「セクター別の合計」が典型用途。
+    - 結果は **グループ列が index** の Series / DataFrame。
+
+    **読み方**: `groupby("X")` で X が同じ行をまとめ、そのあと集計関数を適用、と読む。
+
+    ---
+
     下のコードの出力として正しいものを選んでください。
   code: |
     import pandas as pd
@@ -163,6 +233,16 @@ pages:
 - kind: reading
   title: merge の挙動（章 15 復習）
   prompt: |
+    **この問題の文法ポイント**
+
+    - `left.merge(right, on="key")` は 2 つの DataFrame を **key 列の値が一致する行** で結合 (SQL の JOIN)。
+    - `how=` で `"inner"` (両方にある, 既定) / `"left"` (左を残す) / `"outer"` (両方) を選ぶ。
+    - 結合後の行数は how と key の重複具合で決まる。
+
+    **読み方**: `on=` の列で **値が同じ行同士を横に並べる**、とイメージ。
+
+    ---
+
     下のコードを実行したとき、結果の行数として正しいものを選んでください。
   code: |
     import pandas as pd
