@@ -23,7 +23,6 @@ import argparse
 import contextlib
 import logging
 import os
-import signal
 import socket
 import sys
 import threading
@@ -60,17 +59,42 @@ def _configure_logging() -> None:
     logging.basicConfig(level=logging.INFO, handlers=[handler])
 
 
-def _pick_free_port(preferred: int) -> int:
-    """Return ``preferred`` if it's free; otherwise pick any free port."""
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "0:0:0:0:0:0:0:1"}
+
+
+def _is_loopback(host: str) -> bool:
+    return host.lower() in _LOOPBACK_HOSTS
+
+
+def _pick_free_port(host: str, preferred: int) -> int:
+    """Return ``preferred`` if it's free on ``host``; otherwise pick any free port.
+
+    Probes on the actual bind address so a --host 0.0.0.0 / --port 0 run picks
+    a port that is free on every interface, not just on loopback.
+    """
+    if preferred:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind((host, preferred))
+                return preferred
+            except OSError:
+                pass
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        try:
-            s.bind(("127.0.0.1", preferred))
-            return preferred
-        except OSError:
-            pass
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
+        s.bind((host, 0))
         return s.getsockname()[1]
+
+
+def _display_host(bind_host: str) -> str:
+    """Pick a host the browser can actually reach.
+
+    Binding to 0.0.0.0 / :: makes the socket reachable on every interface, but
+    those addresses are not valid destinations for the browser (Firefox /
+    Safari refuse ``http://0.0.0.0/``). In that case we tell the user to
+    connect to 127.0.0.1.
+    """
+    if bind_host in ("0.0.0.0", "::", ""):
+        return "127.0.0.1"
+    return bind_host
 
 
 def _print_banner(url: str) -> None:
@@ -90,7 +114,31 @@ def main() -> int:
     parser.add_argument("--host", default="127.0.0.1", help="listen address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8765, help="port (default: 8765; 0 = pick free port)")
     parser.add_argument("--no-browser", action="store_true", help="don't open the system browser")
+    parser.add_argument(
+        "--insecure-lan",
+        action="store_true",
+        help=(
+            "Allow binding to a non-loopback address (e.g. 0.0.0.0) WITHOUT authentication. "
+            "The /api/run-code endpoint executes arbitrary Python — anyone on the same network "
+            "can run code on this machine. Required acknowledgement flag for non-loopback hosts."
+        ),
+    )
     args = parser.parse_args()
+
+    # Refuse non-loopback hosts unless the user has explicitly acknowledged the
+    # consequences. The Jupyter kernel reachable through /api/run-code is a
+    # trivial RCE primitive; we don't want a user to accidentally expose it on
+    # a shared network by following a copy-paste from the README.
+    if not _is_loopback(args.host) and not args.insecure_lan:
+        print(
+            f"[fatal] --host {args.host} は loopback ではありません。\n"
+            "        このアプリは認証を行わず、/api/run-code 経由で任意の Python を\n"
+            "        実行できるため、LAN/インターネットに公開すると同ネットワーク上の\n"
+            "        誰でもこの端末でコード実行できる状態になります。\n"
+            "        意図的にネットワーク公開する場合は --insecure-lan を追加してください。",
+            file=sys.stderr,
+        )
+        return 2
 
     _configure_logging()
 
@@ -138,11 +186,7 @@ def main() -> int:
     threading.Thread(target=_start_kernel, name="kernel-bootstrap", daemon=True).start()
 
     # ----- Pick a port + spin up uvicorn -----
-    port = args.port if args.port == 0 else _pick_free_port(args.port)
-    if args.port == 0:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("127.0.0.1", 0))
-            port = s.getsockname()[1]
+    port = _pick_free_port(args.host, args.port)
 
     config = uvicorn.Config(
         app,
@@ -154,7 +198,8 @@ def main() -> int:
     )
     server = uvicorn.Server(config)
 
-    url = f"http://{args.host}:{port}/"
+    display_host = _display_host(args.host)
+    url = f"http://{display_host}:{port}/"
     _print_banner(url)
 
     # ----- Open the browser after the server is ready -----
@@ -163,7 +208,7 @@ def main() -> int:
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline:
             try:
-                with socket.create_connection((args.host, port), timeout=0.2):
+                with socket.create_connection((display_host, port), timeout=0.2):
                     break
             except OSError:
                 time.sleep(0.1)
@@ -189,16 +234,6 @@ def main() -> int:
             pass
 
     return 0
-
-
-def _install_sigint_handler() -> None:
-    # Uvicorn already installs its own signal handlers, but a clean exit
-    # on a second Ctrl+C is nice in case the kernel hangs.
-    def _handler(signum, frame):  # noqa: ANN001
-        sys.exit(0)
-
-    with contextlib.suppress(Exception):
-        signal.signal(signal.SIGINT, _handler)
 
 
 if __name__ == "__main__":

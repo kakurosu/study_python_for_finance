@@ -24,6 +24,7 @@ client only needed a small shim, not a rewrite):
     POST /api/progress              → save chapter / page progress
     POST /api/clear-learning-data   → wipe all progress for the active user
     GET  /api/export-progress       → download progress.json as attachment
+    POST /api/kernel/restart        → restart the IPython kernel
     GET  /api/events                → SSE feed (kernel state, etc.)
 """
 
@@ -46,7 +47,7 @@ from fastapi.responses import (
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .content.loader import assemble_code
 from .content.schemas import (
@@ -74,14 +75,21 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 # ---------------------------------------------------------------------------
 
 
+# Hard cap on submitted code size. 256 KiB is more than enough for any
+# legitimate exercise / sample, and tight enough to keep a runaway client
+# (or a `--insecure-lan` attacker) from streaming gigabytes into the
+# Jupyter kernel's ZMQ pipe.
+MAX_CODE_BYTES = 256 * 1024
+
+
 class RunCodeRequest(BaseModel):
-    code: str
+    code: str = Field(max_length=MAX_CODE_BYTES)
 
 
 class GradeExerciseRequest(BaseModel):
     chapter_id: int
     page_index: int
-    answers: dict[str, Any] = {}
+    answers: dict[str, Any] = Field(default_factory=dict)
 
 
 class GradeReadingRequest(BaseModel):
@@ -93,12 +101,12 @@ class GradeReadingRequest(BaseModel):
 class AssembleCodeRequest(BaseModel):
     chapter_id: int
     page_index: int
-    answers: dict[str, Any] = {}
+    answers: dict[str, Any] = Field(default_factory=dict)
 
 
 class GradeTestRequest(BaseModel):
     q_index: int
-    answers: dict[str, Any] = {}
+    answers: dict[str, Any] = Field(default_factory=dict)
 
 
 class RecordTestResultRequest(BaseModel):
@@ -106,7 +114,8 @@ class RecordTestResultRequest(BaseModel):
     score: int
     total: int
     seconds: int = 0
-    perQuestion: list[dict[str, Any]] = []  # noqa: N815 — wire-compat with the JS client
+    # noqa: N815 — wire-compat with the JS client
+    perQuestion: list[dict[str, Any]] = Field(default_factory=list)  # noqa: N815
     started_at: str | None = None
 
 
@@ -122,12 +131,27 @@ class SaveProgressRequest(BaseModel):
 
 
 class EventBus:
-    """Tiny pub/sub used by /api/events to stream kernel state to the UI."""
+    """Tiny pub/sub used by /api/events to stream kernel state to the UI.
+
+    Publishing is thread-safe: `publish()` can be called from any worker
+    thread (e.g. the kernel-bootstrap thread in app/main.py) and the
+    message is scheduled onto the captured uvicorn loop via
+    `call_soon_threadsafe`.
+
+    The loop reference is captured by `attach_loop()`, which the FastAPI
+    startup hook calls once the asyncio loop is actually running. Before
+    that, `publish()` records `_last_state` so new subscribers still see
+    the most recent value when they connect.
+    """
 
     def __init__(self) -> None:
         self._subscribers: set[asyncio.Queue[str]] = set()
         self._lock = asyncio.Lock()
         self._last_state: dict[str, Any] = {"type": "kernel_state", "state": "starting"}
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+    def attach_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
 
     async def subscribe(self) -> asyncio.Queue[str]:
         q: asyncio.Queue[str] = asyncio.Queue(maxsize=16)
@@ -145,14 +169,13 @@ class EventBus:
         msg = json.dumps(payload)
         if payload.get("type") == "kernel_state":
             self._last_state = payload
-        # The FastAPI app must run on an asyncio loop; we schedule the put
-        # on it so this method is callable from sync code (e.g. the Python
-        # CLI launcher).
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            return
-        if not loop.is_running():
+        # Use the loop captured at FastAPI startup, NOT
+        # `asyncio.get_event_loop()` (which is deprecated when called from a
+        # thread with no running loop and raises in 3.14+). If no loop is
+        # captured yet (publish racing startup), drop the live push — every
+        # new subscriber still gets `_last_state` on connect.
+        loop = self._loop
+        if loop is None or not loop.is_running():
             return
         for q in list(self._subscribers):
             loop.call_soon_threadsafe(self._safe_put_nowait, q, msg)
@@ -202,6 +225,13 @@ def create_app(ctx: ServerContext) -> FastAPI:
         redoc_url=None,
         openapi_url=None,
     )
+
+    # Capture the running asyncio loop once uvicorn has started it, so the
+    # event bus can schedule pushes from worker threads without falling
+    # back to the deprecated asyncio.get_event_loop().
+    @app.on_event("startup")
+    async def _attach_loop() -> None:  # noqa: D401
+        ctx.events.attach_loop(asyncio.get_running_loop())
 
     # Static assets ---------------------------------------------------------
     app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
@@ -259,14 +289,25 @@ def create_app(ctx: ServerContext) -> FastAPI:
         test_results: list[dict[str, Any]] = []
         try:
             for r in ctx.repo.list_test_results(ctx.user_id):
+                # Skip rows with total=0 so a corrupt / hand-edited record
+                # doesn't render as "700% PASS" in the history view.
+                if r.total <= 0:
+                    continue
                 ts = ctx.test_sets.get(r.test_id)
+                # Emit both the pre-formatted UTC date (for compatibility
+                # with consumers that just need a string) and the raw ISO
+                # timestamp so the JS sparkline can bucket in the user's
+                # LOCAL timezone instead of UTC — otherwise a test finished
+                # at 08:30 JST lands in yesterday's bucket on the chart.
+                fin = r.finished_at
                 test_results.append(
                     {
-                        "date": r.finished_at.strftime("%Y-%m-%d") if r.finished_at else "",
+                        "date": fin.strftime("%Y-%m-%d") if fin else "",
+                        "finished_at": (fin.replace(tzinfo=UTC).isoformat() if fin else None),
                         "test_id": r.test_id,
                         "title": ts.title if ts else r.test_id,
-                        "score": int(r.score / max(r.total, 1) * 100),
-                        "pass": (r.score / max(r.total, 1)) >= 0.6,
+                        "score": int(r.score / r.total * 100),
+                        "pass": (r.score / r.total) >= 0.6,
                         "duration_sec": r.duration_sec,
                     }
                 )
@@ -364,7 +405,9 @@ def create_app(ctx: ServerContext) -> FastAPI:
     @app.post("/api/run-code")
     async def run_code(req: RunCodeRequest) -> JSONResponse:
         try:
-            res = await asyncio.to_thread(ctx.kernel.execute, req.code, 15)
+            # `timeout` on KernelSession.execute is keyword-only — passing 15
+            # positionally raised TypeError on every /api/run-code request.
+            res = await asyncio.to_thread(lambda: ctx.kernel.execute(req.code, timeout=15))
         except Exception as e:
             return JSONResponse(
                 {
@@ -411,6 +454,34 @@ def create_app(ctx: ServerContext) -> FastAPI:
             return JSONResponse({"ok": False, "error": "not an exercise page"})
         try:
             gr = await asyncio.to_thread(grade_exercise, page, req.answers, ctx.kernel)
+            # Self-heal: the form is correct but execution failed because the
+            # kernel namespace was polluted by an earlier exercise. Restart the
+            # kernel once and re-grade — this matches the behaviour the old
+            # PyQt ChapterView had on every submit attempt.
+            if (
+                not gr.overall_passed
+                and gr.form_passed
+                and gr.execution is not None
+                and gr.execution.status != "ok"
+            ):
+                await asyncio.to_thread(ctx.kernel.restart)
+                gr = await asyncio.to_thread(grade_exercise, page, req.answers, ctx.kernel)
+
+            # Persist the attempt so it shows up in /api/export-progress and
+            # in any future analytics. The repo write is on a worker thread
+            # because it's synchronous file I/O.
+            await asyncio.to_thread(
+                ctx.repo.record_submission,
+                ctx.user_id,
+                chapter_id=req.chapter_id,
+                page_index=req.page_index,
+                code=gr.assembled_code or "",
+                passed=gr.overall_passed,
+                stdout=gr.execution.stdout if gr.execution else "",
+                stderr=gr.execution.stderr if gr.execution else "",
+                hint_level_shown=0,
+            )
+
             return JSONResponse(
                 {
                     "ok": True,
@@ -440,6 +511,18 @@ def create_app(ctx: ServerContext) -> FastAPI:
             return JSONResponse({"ok": False, "error": "not a reading page"})
         try:
             gr = grade_reading(page, req.selected)
+            # Persist the reading attempt the same way Exercise pages do.
+            await asyncio.to_thread(
+                ctx.repo.record_submission,
+                ctx.user_id,
+                chapter_id=req.chapter_id,
+                page_index=req.page_index,
+                code=f"# reading: selected={req.selected}",
+                passed=gr.overall_passed,
+                stdout="",
+                stderr="",
+                hint_level_shown=0,
+            )
             return JSONResponse(
                 {
                     "ok": True,
@@ -597,6 +680,25 @@ def create_app(ctx: ServerContext) -> FastAPI:
             return JSONResponse({"ok": True})
         except Exception as e:
             log.exception("save_progress failed")
+            return JSONResponse({"ok": False, "error": str(e)})
+
+    @app.post("/api/kernel/restart")
+    async def kernel_restart() -> JSONResponse:
+        """Restart the IPython kernel so the next chapter / test starts clean.
+
+        The legacy PyQt UI restarted the kernel on every chapter / test entry
+        so cross-chapter namespace pollution couldn't masquerade as a correct
+        answer or as a NameError demo. This endpoint reinstates that
+        behaviour for the web client.
+        """
+        try:
+            ctx.events.publish({"type": "kernel_state", "state": "starting"})
+            await asyncio.to_thread(ctx.kernel.restart)
+            ctx.events.publish({"type": "kernel_state", "state": "ready"})
+            return JSONResponse({"ok": True})
+        except Exception as e:
+            log.exception("kernel restart failed")
+            ctx.events.publish({"type": "kernel_state", "state": "error"})
             return JSONResponse({"ok": False, "error": str(e)})
 
     @app.post("/api/clear-learning-data")
