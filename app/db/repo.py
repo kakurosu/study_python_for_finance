@@ -121,11 +121,7 @@ class Repository:
         if not self._path.exists() and sqlite_sibling.exists():
             legacy_sqlite_path = sqlite_sibling
         self._state = self._load()
-        if (
-            legacy_sqlite_path is not None
-            and legacy_sqlite_path.exists()
-            and self._is_empty_state()
-        ):
+        if legacy_sqlite_path is not None and legacy_sqlite_path.exists() and self._is_empty_state():
             self._import_legacy_sqlite(legacy_sqlite_path)
 
     def _is_empty_state(self) -> bool:

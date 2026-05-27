@@ -289,14 +289,25 @@ def create_app(ctx: ServerContext) -> FastAPI:
         test_results: list[dict[str, Any]] = []
         try:
             for r in ctx.repo.list_test_results(ctx.user_id):
+                # Skip rows with total=0 so a corrupt / hand-edited record
+                # doesn't render as "700% PASS" in the history view.
+                if r.total <= 0:
+                    continue
                 ts = ctx.test_sets.get(r.test_id)
+                # Emit both the pre-formatted UTC date (for compatibility
+                # with consumers that just need a string) and the raw ISO
+                # timestamp so the JS sparkline can bucket in the user's
+                # LOCAL timezone instead of UTC — otherwise a test finished
+                # at 08:30 JST lands in yesterday's bucket on the chart.
+                fin = r.finished_at
                 test_results.append(
                     {
-                        "date": r.finished_at.strftime("%Y-%m-%d") if r.finished_at else "",
+                        "date": fin.strftime("%Y-%m-%d") if fin else "",
+                        "finished_at": (fin.replace(tzinfo=UTC).isoformat() if fin else None),
                         "test_id": r.test_id,
                         "title": ts.title if ts else r.test_id,
-                        "score": int(r.score / max(r.total, 1) * 100),
-                        "pass": (r.score / max(r.total, 1)) >= 0.6,
+                        "score": int(r.score / r.total * 100),
+                        "pass": (r.score / r.total) >= 0.6,
                         "duration_sec": r.duration_sec,
                     }
                 )

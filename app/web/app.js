@@ -454,10 +454,19 @@ function renderSparkChart() {
   const dayLabels = ['日','月','火','水','木','金','土'];
   const dayKeys = days.map(fmtKey);
 
-  // Aggregate avg score per day.
+  // Aggregate avg score per day. Bucket by LOCAL date so a test finished
+  // at 08:30 JST doesn't get pushed into yesterday's UTC bucket. We use
+  // r.finished_at (ISO timestamp from the server) when available and fall
+  // back to r.date (server-side UTC date string) only if the timestamp is
+  // missing.
   const scoresByDay = Object.fromEntries(dayKeys.map(k => [k, []]));
   for (const r of state.testResults) {
-    if (scoresByDay[r.date] != null) scoresByDay[r.date].push(r.score);
+    let key = r.date;
+    if (r.finished_at) {
+      const dt = new Date(r.finished_at);
+      if (!isNaN(dt.getTime())) key = fmtKey(dt);
+    }
+    if (scoresByDay[key] != null) scoresByDay[key].push(r.score);
   }
   const points = dayKeys.map(k => {
     const arr = scoresByDay[k];
@@ -680,6 +689,14 @@ function startTestTimer() {
 function paintTestQuestion() {
   const t = state.test;
   if (!t) return;
+  // Empty test set: guard the divisor and bail out cleanly instead of
+  // rendering NaN% and TypeError'ing on q.title.
+  if (!t.questions || t.questions.length === 0) {
+    $('#tr-counter').textContent = 'Q 0 / 0';
+    $('#tr-prog').style.width = '0%';
+    $('#tr-body').innerHTML = `<div class="lesson__intro"><h2 class="lesson__title">問題がありません</h2><p>このテストセットには問題が登録されていません。</p></div>`;
+    return;
+  }
   const q = t.questions[t.qIndex];
   $('#tr-counter').textContent = `Q ${t.qIndex + 1} / ${t.questions.length}`;
   $('#tr-prog').style.width = `${(t.qIndex) / t.questions.length * 100}%`;
@@ -1580,23 +1597,41 @@ function bindUi() {
 function buildBridge() {
   // Default JSON post helper that returns the raw response text (since
   // callers do JSON.parse on it). We also accept query-string objects for
-  // GET endpoints.
+  // GET endpoints. Non-2xx responses surface as a thrown Error so the cb
+  // wrapper's .catch path runs (instead of silently feeding 500 bodies
+  // into JSON.parse and leaving the UI blank).
+  const ensureOk = async (res, path) => {
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status} from ${path}: ${text.slice(0, 200)}`);
+    }
+    return await res.text();
+  };
   const post = async (path, body) => {
     const res = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body || {}),
     });
-    return await res.text();
+    return await ensureOk(res, path);
   };
   const get = async (path) => {
     const res = await fetch(path);
-    return await res.text();
+    return await ensureOk(res, path);
   };
   // Wrap a promise-returning function so it matches the legacy
-  // (...args, callback) signature used throughout this file.
+  // (...args, callback) signature used throughout this file. Only pops
+  // the last arg as the callback when it's actually a function — otherwise
+  // a caller that forgets the callback would silently consume a real data
+  // argument (e.g. `bridge.chapterDetailJson(123)` would fetch /api/chapter/
+  // undefined and try to invoke 123 as a function).
   const cb = (fn) => (...args) => {
-    const callback = args.pop();
+    let callback;
+    if (args.length && typeof args[args.length - 1] === 'function') {
+      callback = args.pop();
+    } else {
+      console.warn('bridge call missing callback', fn.name || fn, args);
+    }
     Promise.resolve(fn(...args))
       .then((v) => { try { callback && callback(v); } catch (e) { console.warn(e); } })
       .catch((e) => {
@@ -1661,8 +1696,16 @@ function buildBridge() {
 
 function safeJson(v) {
   if (v == null) return {};
-  if (typeof v === 'object') return v;
-  try { return JSON.parse(v); } catch (e) { return {}; }
+  // Plain objects pass through; arrays and primitives never do — the
+  // caller contract is "a key/value bag" (e.g. blank answers, payload
+  // record), and JSON.parse on a numeric / boolean / array string would
+  // silently break the server request body.
+  if (typeof v === 'object' && !Array.isArray(v)) return v;
+  if (typeof v !== 'string') return {};
+  try {
+    const parsed = JSON.parse(v);
+    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+  } catch (e) { return {}; }
 }
 
 // Fire-and-forget kernel restart. Called when the user opens a new chapter
