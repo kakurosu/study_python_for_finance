@@ -405,7 +405,9 @@ def create_app(ctx: ServerContext) -> FastAPI:
     @app.post("/api/run-code")
     async def run_code(req: RunCodeRequest) -> JSONResponse:
         try:
-            res = await asyncio.to_thread(ctx.kernel.execute, req.code, 15)
+            # `timeout` on KernelSession.execute is keyword-only — passing 15
+            # positionally raised TypeError on every /api/run-code request.
+            res = await asyncio.to_thread(lambda: ctx.kernel.execute(req.code, timeout=15))
         except Exception as e:
             return JSONResponse(
                 {
