@@ -59,8 +59,26 @@ uv run study-python
 ```bash
 uv run study-python --port 0          # 空きポートを自動取得
 uv run study-python --no-browser      # ブラウザを開かずサーバのみ
-uv run study-python --host 0.0.0.0    # LAN 内の他端末からもアクセス
 ```
+
+#### ⚠️ ネットワーク公開 (`--host 0.0.0.0`)
+
+本アプリは **認証なし** で動作し、`/api/run-code` 経由で任意の Python を
+Jupyter カーネル上で実行できます。loopback (`127.0.0.1`) で動かしている
+限り、他端末からは到達できないため安全です。
+
+`--host 0.0.0.0` 等で **非 loopback アドレスにバインドする場合は明示的に
+`--insecure-lan` フラグも併用する必要があります**:
+
+```bash
+uv run study-python --host 0.0.0.0 --insecure-lan
+```
+
+`--insecure-lan` 無しで非 loopback を指定するとアプリは起動を拒否します。
+LAN 越しに使う場合、同ネットワーク上の任意のユーザがこの端末で
+コード実行できる状態になることを十分理解した上で使用してください。
+公開された環境 (社外ネットワーク、ホテル / 公共 Wi-Fi 等) では絶対に
+使用しないでください。
 
 ## 開発者向け
 

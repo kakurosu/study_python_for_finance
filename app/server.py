@@ -46,7 +46,7 @@ from fastapi.responses import (
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .content.loader import assemble_code
 from .content.schemas import (
@@ -74,14 +74,21 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 # ---------------------------------------------------------------------------
 
 
+# Hard cap on submitted code size. 256 KiB is more than enough for any
+# legitimate exercise / sample, and tight enough to keep a runaway client
+# (or a `--insecure-lan` attacker) from streaming gigabytes into the
+# Jupyter kernel's ZMQ pipe.
+MAX_CODE_BYTES = 256 * 1024
+
+
 class RunCodeRequest(BaseModel):
-    code: str
+    code: str = Field(max_length=MAX_CODE_BYTES)
 
 
 class GradeExerciseRequest(BaseModel):
     chapter_id: int
     page_index: int
-    answers: dict[str, Any] = {}
+    answers: dict[str, Any] = Field(default_factory=dict)
 
 
 class GradeReadingRequest(BaseModel):
@@ -93,12 +100,12 @@ class GradeReadingRequest(BaseModel):
 class AssembleCodeRequest(BaseModel):
     chapter_id: int
     page_index: int
-    answers: dict[str, Any] = {}
+    answers: dict[str, Any] = Field(default_factory=dict)
 
 
 class GradeTestRequest(BaseModel):
     q_index: int
-    answers: dict[str, Any] = {}
+    answers: dict[str, Any] = Field(default_factory=dict)
 
 
 class RecordTestResultRequest(BaseModel):
@@ -106,7 +113,8 @@ class RecordTestResultRequest(BaseModel):
     score: int
     total: int
     seconds: int = 0
-    perQuestion: list[dict[str, Any]] = []  # noqa: N815 — wire-compat with the JS client
+    # noqa: N815 — wire-compat with the JS client
+    perQuestion: list[dict[str, Any]] = Field(default_factory=list)  # noqa: N815
     started_at: str | None = None
 
 
