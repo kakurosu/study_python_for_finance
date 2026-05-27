@@ -1,4 +1,4 @@
-"""Tests for SQLAlchemy Repository."""
+"""Tests for the JSON-file Repository (formerly SQLAlchemy/SQLite)."""
 
 from __future__ import annotations
 

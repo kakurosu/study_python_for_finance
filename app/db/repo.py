@@ -1,19 +1,37 @@
-"""Repository layer: thin wrappers around SQLAlchemy queries.
+"""Repository: JSON-file-backed persistence layer.
 
-The Repository owns the engine + Session factory. The UI layer never imports
-SQLAlchemy directly — it only goes through ``Repository`` methods.
+Originally this module wrapped SQLAlchemy / SQLite. The store is now a
+single JSON file on disk — for a single-user local learning app with a
+few thousand rows, that's faster, has zero native dependencies, and the
+file is easy to back up by copy.
+
+The public method signatures are intentionally unchanged so the FastAPI
+server and the test suite need no edits beyond their import paths.
+
+Concurrency model
+-----------------
+The whole file is loaded into memory on construction and flushed after
+every mutation under an ``RLock``. FastAPI dispatches handlers on a
+single asyncio loop, but ``asyncio.to_thread`` can run grading off the
+loop concurrently with progress writes, so the lock matters even though
+this is a single-process app.
+
+Writes are atomic — we render to a sibling ``*.tmp`` and ``os.replace``
+it onto the destination, so a crash mid-write cannot corrupt the
+canonical file.
 """
 
 from __future__ import annotations
 
+import json
+import logging
+import os
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
-
-from sqlalchemy import create_engine, delete, func, select
-from sqlalchemy.orm import Session, sessionmaker
+from typing import Any
 
 from .models import (
-    Base,
     CellSubmission,
     ChapterProgress,
     ChapterStatus,
@@ -21,41 +39,194 @@ from .models import (
     User,
 )
 
+log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# datetime helpers — JSON has no native date type, so we round-trip via
+# ISO-8601 strings stored without timezone info (the original SQLite schema
+# stored naive datetimes too).
+# ---------------------------------------------------------------------------
+
+
+def _now() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _dt_to_str(dt: datetime | None) -> str | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(UTC).replace(tzinfo=None)
+    return dt.isoformat()
+
+
+def _str_to_dt(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+    try:
+        return datetime.fromisoformat(str(value)).replace(tzinfo=None)
+    except (TypeError, ValueError):
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Empty-state factory
+# ---------------------------------------------------------------------------
+
+
+def _empty_state() -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "users": [],
+        "chapter_progress": [],
+        "cell_submissions": [],
+        "test_results": [],
+        "next_ids": {
+            "user": 1,
+            "progress": 1,
+            "submission": 1,
+            "test_result": 1,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Repository
+# ---------------------------------------------------------------------------
+
 
 class Repository:
-    def __init__(self, db_path: Path):
-        db_path = db_path.resolve()
+    """JSON-file-backed store. Drop-in replacement for the old SQLAlchemy one."""
+
+    def __init__(self, db_path: Path) -> None:
+        db_path = Path(db_path).resolve()
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.engine = create_engine(f"sqlite:///{db_path}", future=True)
-        Base.metadata.create_all(self.engine)
-        self._Session = sessionmaker(self.engine, expire_on_commit=False, future=True)
+        # Accept the legacy "*.db" path the SQLite store used. Swap to a
+        # ``.json`` sibling so we never overwrite a real SQLite file by
+        # accident. Existing ``progress.db`` files are left alone for the
+        # user to delete; the app will start with a fresh ``progress.json``.
+        if db_path.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
+            db_path = db_path.with_suffix(".json")
+        self._path = db_path
+        self._lock = threading.RLock()
+        self._state = self._load()
 
     # ------------------------------------------------------------------
-    def session(self) -> Session:
-        return self._Session()
+    # File I/O
+    # ------------------------------------------------------------------
+    def _load(self) -> dict[str, Any]:
+        if not self._path.exists():
+            return _empty_state()
+        try:
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            log.exception("progress store unreadable, starting fresh: %s", self._path)
+            try:
+                backup = self._path.with_suffix(f".corrupt-{int(_now().timestamp())}.json")
+                self._path.rename(backup)
+                log.warning("backed up corrupt store to %s", backup)
+            except OSError:
+                pass
+            return _empty_state()
+        # Be forgiving about missing keys so older state files still load.
+        empty = _empty_state()
+        for k, default in empty.items():
+            data.setdefault(k, default)
+        for k, default in empty["next_ids"].items():
+            data["next_ids"].setdefault(k, default)
+        return data
+
+    def _save(self) -> None:
+        tmp = self._path.with_name(self._path.name + ".tmp")
+        payload = json.dumps(self._state, ensure_ascii=False, indent=2)
+        tmp.write_text(payload, encoding="utf-8")
+        os.replace(tmp, self._path)
+
+    def _next_id(self, key: str) -> int:
+        nid = int(self._state["next_ids"].get(key, 1))
+        self._state["next_ids"][key] = nid + 1
+        return nid
+
+    # ------------------------------------------------------------------
+    # Row ↔ dataclass conversion
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _user_from_row(row: dict[str, Any]) -> User:
+        return User(
+            id=int(row["id"]),
+            name=str(row.get("name", "default")),
+            created_at=_str_to_dt(row.get("created_at")),
+        )
+
+    @staticmethod
+    def _progress_from_row(row: dict[str, Any]) -> ChapterProgress:
+        return ChapterProgress(
+            id=int(row["id"]),
+            user_id=int(row["user_id"]),
+            chapter_id=int(row["chapter_id"]),
+            status=ChapterStatus(row.get("status", ChapterStatus.not_started.value)),
+            last_page_index=int(row.get("last_page_index", 0)),
+            updated_at=_str_to_dt(row.get("updated_at")),
+        )
+
+    @staticmethod
+    def _submission_from_row(row: dict[str, Any]) -> CellSubmission:
+        return CellSubmission(
+            id=int(row["id"]),
+            user_id=int(row["user_id"]),
+            chapter_id=int(row["chapter_id"]),
+            page_index=int(row["page_index"]),
+            code=str(row.get("code", "")),
+            passed=bool(row.get("passed", False)),
+            stdout=str(row.get("stdout", "")),
+            stderr=str(row.get("stderr", "")),
+            hint_level_shown=int(row.get("hint_level_shown", 0)),
+            submitted_at=_str_to_dt(row.get("submitted_at")),
+        )
+
+    @staticmethod
+    def _test_result_from_row(row: dict[str, Any]) -> TestResult:
+        return TestResult(
+            id=int(row["id"]),
+            user_id=int(row["user_id"]),
+            test_id=str(row["test_id"]),
+            score=int(row.get("score", 0)),
+            total=int(row.get("total", 0)),
+            duration_sec=int(row.get("duration_sec", 0)),
+            started_at=_str_to_dt(row.get("started_at")),
+            finished_at=_str_to_dt(row.get("finished_at")),
+            per_question_json=str(row.get("per_question_json", "[]")),
+        )
 
     # ------------------------------------------------------------------
     # Users
+    # ------------------------------------------------------------------
     def get_or_create_default_user(self) -> User:
-        with self.session() as s:
-            user = s.scalar(select(User).where(User.name == "default"))
-            if user is None:
-                user = User(name="default")
-                s.add(user)
-                s.commit()
-                s.refresh(user)
-            return user
+        with self._lock:
+            for row in self._state["users"]:
+                if row.get("name") == "default":
+                    return self._user_from_row(row)
+            new_row = {
+                "id": self._next_id("user"),
+                "name": "default",
+                "created_at": _dt_to_str(_now()),
+            }
+            self._state["users"].append(new_row)
+            self._save()
+            return self._user_from_row(new_row)
 
     # ------------------------------------------------------------------
-    # Progress
+    # Chapter progress
+    # ------------------------------------------------------------------
     def get_progress(self, user_id: int, chapter_id: int) -> ChapterProgress | None:
-        with self.session() as s:
-            return s.scalar(
-                select(ChapterProgress).where(
-                    ChapterProgress.user_id == user_id,
-                    ChapterProgress.chapter_id == chapter_id,
-                )
-            )
+        with self._lock:
+            for row in self._state["chapter_progress"]:
+                if row["user_id"] == user_id and row["chapter_id"] == chapter_id:
+                    return self._progress_from_row(row)
+            return None
 
     def upsert_progress(
         self,
@@ -65,57 +236,62 @@ class Repository:
         last_page_index: int,
         status: ChapterStatus,
     ) -> None:
-        with self.session() as s:
-            row = s.scalar(
-                select(ChapterProgress).where(
-                    ChapterProgress.user_id == user_id,
-                    ChapterProgress.chapter_id == chapter_id,
-                )
+        with self._lock:
+            now_str = _dt_to_str(_now())
+            for row in self._state["chapter_progress"]:
+                if row["user_id"] == user_id and row["chapter_id"] == chapter_id:
+                    row["status"] = str(status)
+                    row["last_page_index"] = int(last_page_index)
+                    row["updated_at"] = now_str
+                    self._save()
+                    return
+            self._state["chapter_progress"].append(
+                {
+                    "id": self._next_id("progress"),
+                    "user_id": int(user_id),
+                    "chapter_id": int(chapter_id),
+                    "status": str(status),
+                    "last_page_index": int(last_page_index),
+                    "updated_at": now_str,
+                }
             )
-            if row is None:
-                row = ChapterProgress(
-                    user_id=user_id,
-                    chapter_id=chapter_id,
-                    status=status,
-                    last_page_index=last_page_index,
-                )
-                s.add(row)
-            else:
-                row.status = status
-                row.last_page_index = last_page_index
-                row.updated_at = datetime.now(UTC).replace(tzinfo=None)
-            s.commit()
+            self._save()
 
     def latest_in_progress(self, user_id: int) -> ChapterProgress | None:
-        """Return the most recently-touched chapter that is not yet completed."""
-        with self.session() as s:
-            return s.scalar(
-                select(ChapterProgress)
-                .where(
-                    ChapterProgress.user_id == user_id,
-                    ChapterProgress.status != ChapterStatus.completed,
-                )
-                .order_by(ChapterProgress.updated_at.desc())
+        """Most recently-touched chapter for ``user_id`` that's not completed."""
+        with self._lock:
+            candidates = [
+                row
+                for row in self._state["chapter_progress"]
+                if row["user_id"] == user_id and row.get("status") != ChapterStatus.completed.value
+            ]
+            if not candidates:
+                return None
+            # Sort by updated_at desc; missing timestamps sort last.
+            candidates.sort(
+                key=lambda r: r.get("updated_at") or "",
+                reverse=True,
             )
+            return self._progress_from_row(candidates[0])
 
     def all_progress(self, user_id: int) -> list[ChapterProgress]:
-        with self.session() as s:
-            return list(
-                s.scalars(
-                    select(ChapterProgress).where(ChapterProgress.user_id == user_id)
-                ).all()
-            )
+        with self._lock:
+            return [
+                self._progress_from_row(row)
+                for row in self._state["chapter_progress"]
+                if row["user_id"] == user_id
+            ]
 
     def reset_all(self, user_id: int) -> None:
-        with self.session() as s:
-            for row in s.scalars(
-                select(ChapterProgress).where(ChapterProgress.user_id == user_id)
-            ).all():
-                s.delete(row)
-            s.commit()
+        with self._lock:
+            self._state["chapter_progress"] = [
+                row for row in self._state["chapter_progress"] if row["user_id"] != user_id
+            ]
+            self._save()
 
     # ------------------------------------------------------------------
     # Submissions
+    # ------------------------------------------------------------------
     def record_submission(
         self,
         user_id: int,
@@ -128,39 +304,43 @@ class Repository:
         stderr: str,
         hint_level_shown: int,
     ) -> None:
-        with self.session() as s:
-            s.add(
-                CellSubmission(
-                    user_id=user_id,
-                    chapter_id=chapter_id,
-                    page_index=page_index,
-                    code=code,
-                    passed=passed,
-                    stdout=stdout,
-                    stderr=stderr,
-                    hint_level_shown=hint_level_shown,
-                )
+        with self._lock:
+            self._state["cell_submissions"].append(
+                {
+                    "id": self._next_id("submission"),
+                    "user_id": int(user_id),
+                    "chapter_id": int(chapter_id),
+                    "page_index": int(page_index),
+                    "code": str(code),
+                    "passed": bool(passed),
+                    "stdout": str(stdout),
+                    "stderr": str(stderr),
+                    "hint_level_shown": int(hint_level_shown),
+                    "submitted_at": _dt_to_str(_now()),
+                }
             )
-            s.commit()
+            self._save()
 
     def submissions_for_page(
-        self, user_id: int, chapter_id: int, page_index: int
+        self,
+        user_id: int,
+        chapter_id: int,
+        page_index: int,
     ) -> list[CellSubmission]:
-        with self.session() as s:
-            return list(
-                s.scalars(
-                    select(CellSubmission)
-                    .where(
-                        CellSubmission.user_id == user_id,
-                        CellSubmission.chapter_id == chapter_id,
-                        CellSubmission.page_index == page_index,
-                    )
-                    .order_by(CellSubmission.submitted_at.asc())
-                ).all()
-            )
+        with self._lock:
+            rows = [
+                row
+                for row in self._state["cell_submissions"]
+                if row["user_id"] == user_id
+                and row["chapter_id"] == chapter_id
+                and row["page_index"] == page_index
+            ]
+            rows.sort(key=lambda r: r.get("submitted_at") or "")
+            return [self._submission_from_row(row) for row in rows]
 
     # ------------------------------------------------------------------
     # Test results
+    # ------------------------------------------------------------------
     def record_test_result(
         self,
         user_id: int,
@@ -173,53 +353,82 @@ class Repository:
         started_at: datetime,
         finished_at: datetime,
     ) -> int:
-        with self.session() as s:
-            row = TestResult(
-                user_id=user_id,
-                test_id=test_id,
-                score=score,
-                total=total,
-                duration_sec=duration_sec,
-                per_question_json=per_question_json,
-                started_at=started_at,
-                finished_at=finished_at,
+        with self._lock:
+            new_id = self._next_id("test_result")
+            self._state["test_results"].append(
+                {
+                    "id": new_id,
+                    "user_id": int(user_id),
+                    "test_id": str(test_id),
+                    "score": int(score),
+                    "total": int(total),
+                    "duration_sec": int(duration_sec),
+                    "started_at": _dt_to_str(started_at),
+                    "finished_at": _dt_to_str(finished_at),
+                    "per_question_json": str(per_question_json),
+                }
             )
-            s.add(row)
-            s.commit()
-            s.refresh(row)
-            return row.id
-
-    def clear_user_data(self, user_id: int) -> dict[str, int]:
-        """Wipe all chapter progress, submissions and test results for a user.
-
-        Returns a count summary so the caller can show "N rows removed".
-        The user row itself is preserved.
-        """
-        from sqlalchemy import delete  # local import to avoid cycles
-        with self.session() as s:
-            p_count  = s.scalar(select(func.count()).select_from(ChapterProgress)
-                                .where(ChapterProgress.user_id == user_id)) or 0
-            s_count  = s.scalar(select(func.count()).select_from(CellSubmission)
-                                .where(CellSubmission.user_id == user_id)) or 0
-            t_count  = s.scalar(select(func.count()).select_from(TestResult)
-                                .where(TestResult.user_id == user_id)) or 0
-
-            s.execute(delete(ChapterProgress).where(ChapterProgress.user_id == user_id))
-            s.execute(delete(CellSubmission ).where(CellSubmission.user_id  == user_id))
-            s.execute(delete(TestResult     ).where(TestResult.user_id      == user_id))
-            s.commit()
-            return {
-                "chapter_progress": int(p_count),
-                "submissions":      int(s_count),
-                "test_results":     int(t_count),
-            }
+            self._save()
+            return new_id
 
     def list_test_results(self, user_id: int) -> list[TestResult]:
-        with self.session() as s:
-            return list(
-                s.scalars(
-                    select(TestResult)
-                    .where(TestResult.user_id == user_id)
-                    .order_by(TestResult.finished_at.desc())
-                ).all()
+        with self._lock:
+            rows = [row for row in self._state["test_results"] if row["user_id"] == user_id]
+            rows.sort(key=lambda r: r.get("finished_at") or "", reverse=True)
+            return [self._test_result_from_row(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # Wipe
+    # ------------------------------------------------------------------
+    def clear_user_data(self, user_id: int) -> dict[str, int]:
+        """Drop progress / submissions / test results for ``user_id``.
+
+        Returns a count summary; the user row itself is preserved.
+        """
+        with self._lock:
+            p_count = sum(1 for r in self._state["chapter_progress"] if r["user_id"] == user_id)
+            s_count = sum(1 for r in self._state["cell_submissions"] if r["user_id"] == user_id)
+            t_count = sum(1 for r in self._state["test_results"] if r["user_id"] == user_id)
+            self._state["chapter_progress"] = [
+                r for r in self._state["chapter_progress"] if r["user_id"] != user_id
+            ]
+            self._state["cell_submissions"] = [
+                r for r in self._state["cell_submissions"] if r["user_id"] != user_id
+            ]
+            self._state["test_results"] = [r for r in self._state["test_results"] if r["user_id"] != user_id]
+            self._save()
+            return {
+                "chapter_progress": p_count,
+                "submissions": s_count,
+                "test_results": t_count,
+            }
+
+    # ------------------------------------------------------------------
+    # Export
+    # ------------------------------------------------------------------
+    def export_user_data(self, user_id: int) -> dict[str, Any]:
+        """Return a JSON-serialisable snapshot of everything stored for ``user_id``.
+
+        Used by ``GET /api/export-progress`` so an instructor can collect
+        progress files from each student's machine and aggregate them
+        offline. The returned dict re-uses the same field names as the
+        on-disk store, prefixed with metadata (``exported_at``, schema
+        version) for forward-compatibility.
+        """
+        with self._lock:
+            user = next(
+                (dict(r) for r in self._state["users"] if r["id"] == user_id),
+                None,
             )
+            return {
+                "schema_version": self._state.get("schema_version", 1),
+                "exported_at": _dt_to_str(_now()),
+                "user": user,
+                "chapter_progress": [
+                    dict(r) for r in self._state["chapter_progress"] if r["user_id"] == user_id
+                ],
+                "cell_submissions": [
+                    dict(r) for r in self._state["cell_submissions"] if r["user_id"] == user_id
+                ],
+                "test_results": [dict(r) for r in self._state["test_results"] if r["user_id"] == user_id],
+            }

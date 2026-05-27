@@ -44,11 +44,11 @@ git 管理しているのは **study_python_finance/** のみ（`.git` はこち
 |--------|------|
 | 言語 | Python 3.11+（3.13 で動作確認済み） |
 | パッケージマネージャ | **uv 0.11.6+** (`pyproject.toml` で required-version 指定済み) |
-| UI | PyQt6 6.11 |
+| UI | HTML/CSS/JS（`app/web/`）+ FastAPI ローカルサーバ（`app/server.py`）。起動時に既定のブラウザを自動で開く構成。PyQt6/QWebEngineView の旧シェルは廃止 |
 | カーネル | jupyter_client + ipykernel（バックグラウンドで IPython kernel を起動して実行） |
-| データ層 | SQLAlchemy 2.0 + SQLite (`progress.db`) |
+| データ層 | JSON 1 枚ファイル (`progress.json`)。Python 標準ライブラリ `json` のみで読み書き。`threading.RLock` + `os.replace` で原子的書込。SQL エンジン・ORM・ネイティブライブラリへの依存なし |
 | スキーマ | Pydantic 2.6 |
-| LLM (オプション) | anthropic SDK（`.env` の `ANTHROPIC_API_KEY` が設定されているときのみ「Ask AI」ボタン表示） |
+| LLM 教材 | openai SDK は章 24 (LLM API の使い方を学ぶ) の教材として依存に残置。アプリ自体の AI 機能はなし |
 | 数値計算 | numpy / pandas / matplotlib / scipy / scikit-learn / statsmodels |
 | 深層学習 | PyTorch（章 22 のみ）|
 
@@ -74,20 +74,14 @@ uv run playwright install chromium  # 章 26 用
 ```
 study_python_finance/
 ├── app/
-│   ├── main.py                 # エントリポイント（MainWindow）
-│   ├── ui/
-│   │   ├── launcher.py         # ホーム画面（Continue カード + Status HUD + Quick Actions）
-│   │   ├── chapter_view.py     # 章ビュー（ヘッダー + ページスタック + Stickman + フッター）
-│   │   ├── test_view.py        # 実力テスト（Skip / Submit / Next Question）
-│   │   ├── history_view.py     # テスト結果履歴
-│   │   ├── pages/
-│   │   │   ├── sample_page.py  # サンプルページ（説明 + コード + RUN）
-│   │   │   ├── exercise_page.py # 演習ページ（穴埋め）
-│   │   │   └── result_page.py  # 結果ページ（Correct/Incorrect リビール）
-│   │   ├── blank_slot.py       # 穴埋め用 QLineEdit
-│   │   ├── code_view.py        # VSCode Light Modern 風 CodeBlock
-│   │   ├── output_pane.py      # stdout / 図 / HTML 表示
-│   │   └── stickman.py         # 棒人間ストリップ（フッター上に固定配置）
+│   ├── main.py                 # CLI エントリポイント（FastAPI 起動 + ブラウザ自動オープン）
+│   ├── server.py               # FastAPI アプリ（REST + SSE）
+│   ├── web/                    # フロントエンド (HTML / CSS / JS)
+│   │   ├── index.html          # SPA 全 7 ビュー (Dashboard / Chapters / Practice / Tests / History / Settings / References)
+│   │   ├── styles.css          # ベース (ダーク + ライト) — Inter / JetBrains Mono / KaTeX
+│   │   ├── modern.css          # グラスモーフィズム / 動的グラデーション / フォーカスリング 強化レイヤ
+│   │   ├── app.js              # SPA コントローラ — `bridge` shim が fetch で REST を叩く
+│   │   └── vendor/katex/       # 数式描画ライブラリ
 │   ├── kernel/manager.py       # Jupyter kernel ライフサイクル
 │   ├── content/
 │   │   ├── schemas.py          # Pydantic: Chapter / SamplePage / ExercisePage / TestCase
@@ -95,21 +89,20 @@ study_python_finance/
 │   │   └── loader.py           # YAML → モデル
 │   ├── grading/judge.py        # 採点（form 正規表現 + 動作チェック）
 │   ├── db/
-│   │   ├── models.py           # SQLAlchemy モデル
-│   │   └── repo.py             # Repository
-│   ├── llm/claude_client.py    # Claude API クライアント
+│   │   ├── models.py           # 永続レコードの dataclass 定義
+│   │   └── repo.py             # JSON ファイル永続化リポジトリ
 │   └── resources/
-│       ├── theme.py            # カラートークン + GLOBAL_STYLESHEET (QSS)
-│       └── stickman/           # 4 種の SVG (normal / happy / sad / explain)
+│       ├── fonts/              # Inter / JetBrains Mono
+│       └── stickman/           # 4 種の SVG+PNG (normal / happy / sad / explain)
 ├── content/
 │   ├── chapters/01_*.yaml 〜 26_*.yaml   # 26 章コンテンツ
 │   └── tests/phase_{a,b,c}_test.yaml     # 3 つの実力テスト
 ├── data/                       # サンプル CSV / HTML
-├── tests/                      # pytest（25 件）
-├── scripts/generate_chapters.py # 章 YAML 一括生成スクリプト（Claude API 使用）
+├── tests/                      # pytest（31 件）
+├── scripts/                    # 章 YAML 一括生成 / 整形スクリプト
 ├── pyproject.toml              # uv + 依存定義
-├── uv.lock                     # 157 パッケージの解決結果（コミット済み）
-├── .env.example                # ANTHROPIC_API_KEY サンプル
+├── uv.lock                     # 解決結果（コミット済み）
+├── .env.example                # 環境変数サンプル (proxy / UV_CACHE_DIR)
 └── README.md
 ```
 
@@ -167,11 +160,6 @@ study_python_finance/
 - 不正解時のみ "What failed" を `× <detail>` の形で表示
 - Output セクションは空のときは非表示
 - ChapterView のフッターも結果オーバーレイ表示中は隠す（二重 CTA 回避）
-
-### 「Ask AI」機能
-- `.env` の `ANTHROPIC_API_KEY` が設定されている場合のみ結果ページに表示
-- 200 字以内のヒント返答、答えは書かない指示でプロンプト固定
-- 同一コードへの再呼び出しはキャッシュ
 
 ---
 

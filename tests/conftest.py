@@ -5,9 +5,7 @@ from pathlib import Path
 
 
 def pytest_configure(config):
-    config.addinivalue_line(
-        "markers", "kernel: tests that require a running Jupyter kernel"
-    )
+    config.addinivalue_line("markers", "kernel: tests that require a running Jupyter kernel")
 
 
 # Ensure the project root is on sys.path so ``import app...`` works when running

@@ -171,9 +171,7 @@ class ReadingPage(BaseModel):
     def _index_in_range(cls, v: int, info: ValidationInfo) -> int:
         choices: list[Any] = info.data.get("choices") or []
         if choices and v >= len(choices):
-            raise ValueError(
-                f"correct_index {v} is out of range for {len(choices)} choices"
-            )
+            raise ValueError(f"correct_index {v} is out of range for {len(choices)} choices")
         return v
 
 

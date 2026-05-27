@@ -145,14 +145,10 @@ def grade_exercise(
     # Always assemble + run the code, even if the form check failed: that lets
     # us award credit when the student found a valid alternate solution that
     # accept_patterns didn't anticipate.
-    assembled = assemble_code(
-        page.code_template, {b.id: blank_values.get(b.id, "") for b in page.blanks}
-    )
+    assembled = assemble_code(page.code_template, {b.id: blank_values.get(b.id, "") for b in page.blanks})
     execution = kernel.execute(assembled, timeout=page.timeout_seconds)
     test_results = (
-        evaluate_test_cases(
-            kernel, page.test_cases, assembled_code=assembled, stdout=execution.stdout
-        )
+        evaluate_test_cases(kernel, page.test_cases, assembled_code=assembled, stdout=execution.stdout)
         if execution.status == "ok"
         else []
     )

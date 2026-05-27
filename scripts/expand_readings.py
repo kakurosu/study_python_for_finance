@@ -39,12 +39,12 @@ TITLE_MIGRATION_DONE = ROOT / "scripts" / ".reading_titles_migrated"
 # (which were not updated when the review chapters were renumbered) to the
 # real chapter number in today's layout.
 TARGETS: list[tuple[int, str, dict[int, int]]] = [
-    (11, "A", {}),                                              # Phase A: 01-10 unchanged
-    (16, "B", {11: 12, 12: 13, 13: 14, 14: 15}),                # Phase B: shifted by +1
-    (22, "C", {15: 17, 16: 18, 17: 19, 18: 20, 19: 21}),        # Phase C: shifted by +2
-    (26, "D", {20: 23, 21: 24, 22: 25}),                         # Phase D: shifted by +3
-    (29, "E", {23: 27, 24: 28}),                                 # Phase E: shifted by +4
-    (32, "F", {25: 30, 26: 31}),                                 # Phase F: shifted by +5
+    (11, "A", {}),  # Phase A: 01-10 unchanged
+    (16, "B", {11: 12, 12: 13, 13: 14, 14: 15}),  # Phase B: shifted by +1
+    (22, "C", {15: 17, 16: 18, 17: 19, 18: 20, 19: 21}),  # Phase C: shifted by +2
+    (26, "D", {20: 23, 21: 24, 22: 25}),  # Phase D: shifted by +3
+    (29, "E", {23: 27, 24: 28}),  # Phase E: shifted by +4
+    (32, "F", {25: 30, 26: 31}),  # Phase F: shifted by +5
 ]
 
 # Phase-specific "ありがちな誤り" line (no chapter ref — that goes on the next line)
@@ -126,7 +126,11 @@ def remap_title(title: str, mapping: dict[int, int]) -> tuple[str, int | None]:
 
 
 def expand_chapter(
-    path: Path, phase: str, mapping: dict[int, int], *, migrate_titles: bool,
+    path: Path,
+    phase: str,
+    mapping: dict[int, int],
+    *,
+    migrate_titles: bool,
 ) -> int:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     mistake_line = COMMON_MISTAKE[phase]

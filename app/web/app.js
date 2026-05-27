@@ -940,7 +940,7 @@ function setMascot(mood, speech) {
   const img = $('#mascot-img');
   if (img) {
     const m = ['normal','happy','sad','explain'].includes(mood) ? mood : 'explain';
-    img.src = `../resources/stickman/${m}.png`;
+    img.src = `/resources/stickman/${m}.png`;
     img.alt = m;
   }
   if (speech != null) $('#mascot-speech').textContent = speech;
@@ -1566,32 +1566,137 @@ function bindUi() {
   });
 }
 
-// ---------- QWebChannel bridge ------------------------------------------
-function connectBridge() {
-  if (typeof QWebChannel === 'undefined') return;
-  new QWebChannel(qt.webChannelTransport, (channel) => {
-    bridge = channel.objects.bridge;
-    if (!bridge) return;
-    if (typeof bridge.bootstrapJson === 'function') {
-      bridge.bootstrapJson((json) => {
-        try {
-          const data = JSON.parse(json);
-          if (data.chapters)    state.chapters    = data.chapters;
-          if (data.progress)    state.progress    = data.progress;
-          if (data.testSets)    state.testSets    = data.testSets;
-          if (data.testResults) state.testResults = data.testResults;
-          renderAll();  // includes practice (which now uses bridge)
-        } catch (e) { console.warn('bootstrap parse failed', e); }
+// ---------- REST bridge (replaces the legacy QWebChannel) ----------------
+// The UI used to talk to a PyQt6 Bridge over QWebChannel; we now talk to a
+// local FastAPI server (see app/server.py). To minimise churn in the rest
+// of this file we build a shim object with the same `bridge.method(args,
+// callback)` signature, but each call issues a `fetch()` under the hood.
+function buildBridge() {
+  // Default JSON post helper that returns the raw response text (since
+  // callers do JSON.parse on it). We also accept query-string objects for
+  // GET endpoints.
+  const post = async (path, body) => {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    return await res.text();
+  };
+  const get = async (path) => {
+    const res = await fetch(path);
+    return await res.text();
+  };
+  // Wrap a promise-returning function so it matches the legacy
+  // (...args, callback) signature used throughout this file.
+  const cb = (fn) => (...args) => {
+    const callback = args.pop();
+    Promise.resolve(fn(...args))
+      .then((v) => { try { callback && callback(v); } catch (e) { console.warn(e); } })
+      .catch((e) => {
+        console.warn('bridge call failed', e);
+        try { callback && callback(JSON.stringify({ ok: false, error: String(e) })); } catch (_) {}
       });
-    }
-    if (bridge.kernelState && bridge.kernelState.connect) {
-      bridge.kernelState.connect((s) => {
+  };
+
+  const kernelSubs = [];
+  return {
+    // --- Data ---------------------------------------------------------
+    bootstrapJson:        cb(() => get('/api/bootstrap')),
+    chapterDetailJson:    cb((id) => get(`/api/chapter/${encodeURIComponent(id)}`)),
+    practiceProblemsJson: cb(() => get('/api/practice')),
+    testSetDetailJson:    cb((id) => get(`/api/tests/${encodeURIComponent(id)}`)),
+
+    // --- Execution / grading -----------------------------------------
+    runCode:        cb((code) => post('/api/run-code', { code })),
+    gradeExercise:  cb((chapterId, pageIndex, answersJson) =>
+      post('/api/grade/exercise', {
+        chapter_id: chapterId, page_index: pageIndex,
+        answers: safeJson(answersJson),
+      })),
+    gradeReading:   cb((chapterId, pageIndex, selected) =>
+      post('/api/grade/reading', {
+        chapter_id: chapterId, page_index: pageIndex, selected,
+      })),
+    assembleCode:   cb((payloadJson) => {
+      const p = safeJson(payloadJson);
+      return post('/api/assemble-code', {
+        chapter_id: p.chapter_id, page_index: p.page_index,
+        answers: p.answers || {},
+      });
+    }),
+    gradeTestQuestion: cb((testId, qIndex, answersJson) =>
+      post(`/api/tests/${encodeURIComponent(testId)}/grade`, {
+        q_index: qIndex, answers: safeJson(answersJson),
+      })),
+    recordTestResult: cb((payloadJson) =>
+      post('/api/tests/record-result', safeJson(payloadJson))),
+
+    // --- Mutation -----------------------------------------------------
+    saveProgress: (chapterId, pageIndex, completed) => {
+      // fire-and-forget; the legacy slot had no callback
+      fetch('/api/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chapter_id: chapterId, page_index: pageIndex, completed: !!completed,
+        }),
+      }).catch((e) => console.warn('saveProgress failed', e));
+    },
+    clearLearningData: cb(() => post('/api/clear-learning-data')),
+
+    // --- Signals (mimics the old QObject.signal.connect interface) ---
+    kernelState: {
+      connect: (handler) => { kernelSubs.push(handler); },
+      _emit:   (s) => { for (const h of kernelSubs) { try { h(s); } catch (e) { console.warn(e); } } },
+    },
+  };
+}
+
+function safeJson(v) {
+  if (v == null) return {};
+  if (typeof v === 'object') return v;
+  try { return JSON.parse(v); } catch (e) { return {}; }
+}
+
+function connectBridge() {
+  bridge = buildBridge();
+
+  // 1) Initial bootstrap so the dashboard / chapters / tests render with
+  //    real data right away.
+  if (typeof bridge.bootstrapJson === 'function') {
+    bridge.bootstrapJson((json) => {
+      try {
+        const data = JSON.parse(json);
+        if (data.chapters)    state.chapters    = data.chapters;
+        if (data.progress)    state.progress    = data.progress;
+        if (data.testSets)    state.testSets    = data.testSets;
+        if (data.testResults) state.testResults = data.testResults;
+        renderAll();
+      } catch (e) { console.warn('bootstrap parse failed', e); }
+    });
+  }
+
+  // 2) Subscribe to the server-sent kernel state stream and fan out to
+  //    every handler registered via bridge.kernelState.connect(...).
+  try {
+    const es = new EventSource('/api/events');
+    es.onmessage = (ev) => {
+      let payload;
+      try { payload = JSON.parse(ev.data); } catch (e) { return; }
+      if (payload && payload.type === 'kernel_state' && payload.state) {
+        const s = payload.state;
         $('#kernel-pill').dataset.state = s;
         $('#kernel-pill .kernel-pill__label').textContent = s;
         $('#status-kernel').textContent = `kernel: ${s}`;
-      });
-    }
-  });
+        bridge.kernelState._emit(s);
+      }
+    };
+    // Best-effort reconnect on transient failure
+    es.onerror = () => { /* browser auto-reconnects */ };
+  } catch (e) {
+    console.warn('SSE not available', e);
+  }
 }
 
 function renderAll() {

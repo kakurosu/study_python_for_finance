@@ -4,12 +4,12 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Study Python for Finance</title>
-<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="/static/styles.css" />
+<link rel="stylesheet" href="/static/modern.css" />
 <!-- KaTeX for math rendering (bundled locally) -->
-<link rel="stylesheet" href="vendor/katex/katex.min.css">
-<script defer src="vendor/katex/katex.min.js"></script>
-<script defer src="vendor/katex/auto-render.min.js"></script>
-<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+<script defer src="/static/vendor/katex/katex.min.js"></script>
+<script defer src="/static/vendor/katex/auto-render.min.js"></script>
 </head>
 <body class="theme-dark">
   <!-- ========================================================== -->
@@ -192,7 +192,7 @@
           <!-- Mascot strip (image speaks for itself; no "MENTOR" label) -->
           <div class="mascot">
             <div class="mascot__avatar">
-              <img id="mascot-img" src="../resources/stickman/explain.png" alt="mentor" />
+              <img id="mascot-img" src="/resources/stickman/explain.png" alt="mentor" />
             </div>
             <div class="mascot__speech" id="mascot-speech">コードを読んで、何が起きるか考えてみよう。</div>
             <span class="mascot__pulse"></span>
@@ -389,6 +389,15 @@
               <h3>データの管理</h3>
               <span class="card__hint">学習進捗・提出履歴・テスト結果</span>
             </div>
+
+            <div class="info-zone">
+              <div class="info-zone__txt">
+                <div class="info-zone__title">進捗を JSON でダウンロード</div>
+                <div class="info-zone__sub">章の進捗・演習の提出履歴・実力テストの結果を 1 ファイルにまとめてダウンロードします。講師にまとめて提出したいときや、別の PC に進捗を移したいときに使えます。</div>
+              </div>
+              <a class="btn btn--primary" id="btn-export-data" href="/api/export-progress" download>JSON をダウンロード</a>
+            </div>
+
             <div class="danger-zone">
               <div class="danger-zone__txt">
                 <div class="danger-zone__title">学習履歴を初期化</div>
@@ -481,6 +490,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="/static/app.js"></script>
 </body>
 </html>
