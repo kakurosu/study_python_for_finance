@@ -622,6 +622,8 @@ function startTest(testId) {
     toast('テストデータが読み込めません');
     return;
   }
+  // Restart the kernel so test grading runs against a clean namespace.
+  restartKernel();
   bridge.testSetDetailJson(testId, (json) => {
     let detail;
     try { detail = JSON.parse(json); }
@@ -838,6 +840,10 @@ function showTestResult(r) {
 function openChapter(id) {
   const ch = state.chapters.find(c => c.id === id);
   if (!ch) return;
+  // Restart the kernel so the new chapter starts with a clean namespace;
+  // a stale `df` / function from a previous chapter must not mask the
+  // current chapter's exercises or NameError demos.
+  restartKernel();
   state.currentChapter   = ch;
   // Prefer the last activity position if it matches; otherwise fall back to repo progress
   const lastIdx = (state.lastActivity?.chapterId === id)
@@ -1657,6 +1663,14 @@ function safeJson(v) {
   if (v == null) return {};
   if (typeof v === 'object') return v;
   try { return JSON.parse(v); } catch (e) { return {}; }
+}
+
+// Fire-and-forget kernel restart. Called when the user opens a new chapter
+// or starts a test, so the next code execution runs on a fresh namespace.
+// SSE pushes the kernel-pill state transitions (starting → ready).
+function restartKernel() {
+  fetch('/api/kernel/restart', { method: 'POST' })
+    .catch((e) => console.warn('kernel restart failed', e));
 }
 
 function connectBridge() {

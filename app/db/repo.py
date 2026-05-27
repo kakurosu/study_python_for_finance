@@ -106,13 +106,86 @@ class Repository:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         # Accept the legacy "*.db" path the SQLite store used. Swap to a
         # ``.json`` sibling so we never overwrite a real SQLite file by
-        # accident. Existing ``progress.db`` files are left alone for the
-        # user to delete; the app will start with a fresh ``progress.json``.
+        # accident.
+        legacy_sqlite_path: Path | None = None
         if db_path.suffix.lower() in (".db", ".sqlite", ".sqlite3"):
+            legacy_sqlite_path = db_path
             db_path = db_path.with_suffix(".json")
         self._path = db_path
         self._lock = threading.RLock()
+        # One-shot migration: if a legacy SQLite store sits next to the
+        # JSON path AND no JSON store exists yet, import the SQLite rows
+        # into the JSON state once. This prevents silent data loss when
+        # an existing user upgrades from the SQLAlchemy store.
+        sqlite_sibling = self._path.with_suffix(".db")
+        if not self._path.exists() and sqlite_sibling.exists():
+            legacy_sqlite_path = sqlite_sibling
         self._state = self._load()
+        if (
+            legacy_sqlite_path is not None
+            and legacy_sqlite_path.exists()
+            and self._is_empty_state()
+        ):
+            self._import_legacy_sqlite(legacy_sqlite_path)
+
+    def _is_empty_state(self) -> bool:
+        return (
+            not self._state["users"]
+            and not self._state["chapter_progress"]
+            and not self._state["cell_submissions"]
+            and not self._state["test_results"]
+        )
+
+    def _import_legacy_sqlite(self, sqlite_path: Path) -> None:
+        """Best-effort one-shot import of a legacy SQLAlchemy/SQLite store.
+
+        Reads via stdlib ``sqlite3`` (no SQLAlchemy dependency) and seeds the
+        in-memory state. On any error we log and leave the JSON store empty
+        rather than crash — the user can still re-run with a fresh store.
+        The original ``.db`` file is renamed with a ``.imported`` suffix so
+        the migration is idempotent and the original data is preserved.
+        """
+        import sqlite3
+
+        try:
+            con = sqlite3.connect(f"file:{sqlite_path}?mode=ro", uri=True)
+        except sqlite3.Error:
+            log.exception("legacy sqlite open failed: %s", sqlite_path)
+            return
+        try:
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+            for table in ("users", "chapter_progress", "cell_submissions", "test_results"):
+                try:
+                    cur.execute(f"SELECT * FROM {table}")  # noqa: S608 — fixed names, no user input
+                except sqlite3.Error:
+                    continue
+                rows = [dict(r) for r in cur.fetchall()]
+                self._state[table] = rows
+                if rows:
+                    max_id = max(int(r.get("id", 0)) for r in rows)
+                    key = {
+                        "users": "user",
+                        "chapter_progress": "progress",
+                        "cell_submissions": "submission",
+                        "test_results": "test_result",
+                    }[table]
+                    self._state["next_ids"][key] = max_id + 1
+            self._save()
+            log.info(
+                "imported legacy sqlite store: %d users, %d progress, %d submissions, %d test_results",
+                len(self._state["users"]),
+                len(self._state["chapter_progress"]),
+                len(self._state["cell_submissions"]),
+                len(self._state["test_results"]),
+            )
+        finally:
+            con.close()
+        # Move the SQLite file aside so the migration is idempotent.
+        try:
+            sqlite_path.rename(sqlite_path.with_suffix(".db.imported"))
+        except OSError:
+            log.warning("could not rename %s after import", sqlite_path)
 
     # ------------------------------------------------------------------
     # File I/O
