@@ -22,8 +22,9 @@ dependencies = [
     # Jupyter kernel backend
     "jupyter_client>=8.6",
     "ipykernel>=6.29",
-    # Data layer
-    "SQLAlchemy>=2.0",
+    # Data layer — progress is persisted in a single JSON file (see
+    # app/db/repo.py); pydantic powers the request/response schemas and
+    # the YAML chapter loader. No SQL engine, no ORM, no native libs.
     "pydantic>=2.6",
     "PyYAML>=6.0",
     # Syntax highlighter (still used by the test/grading layer for

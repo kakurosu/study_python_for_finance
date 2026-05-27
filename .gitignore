@@ -194,5 +194,8 @@ __marimo__/
 *.db
 logs/*.log
 progress.db
+progress.json
+progress.json.tmp
+progress.corrupt-*.json
 test_progress.db
 .uv/

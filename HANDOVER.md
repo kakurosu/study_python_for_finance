@@ -46,7 +46,7 @@ git 管理しているのは **study_python_finance/** のみ（`.git` はこち
 | パッケージマネージャ | **uv 0.11.6+** (`pyproject.toml` で required-version 指定済み) |
 | UI | HTML/CSS/JS（`app/web/`）+ FastAPI ローカルサーバ（`app/server.py`）。起動時に既定のブラウザを自動で開く構成。PyQt6/QWebEngineView の旧シェルは廃止 |
 | カーネル | jupyter_client + ipykernel（バックグラウンドで IPython kernel を起動して実行） |
-| データ層 | SQLAlchemy 2.0 + SQLite (`progress.db`) |
+| データ層 | JSON 1 枚ファイル (`progress.json`)。Python 標準ライブラリ `json` のみで読み書き。`threading.RLock` + `os.replace` で原子的書込。SQL エンジン・ORM・ネイティブライブラリへの依存なし |
 | スキーマ | Pydantic 2.6 |
 | LLM 教材 | openai SDK は章 24 (LLM API の使い方を学ぶ) の教材として依存に残置。アプリ自体の AI 機能はなし |
 | 数値計算 | numpy / pandas / matplotlib / scipy / scikit-learn / statsmodels |
@@ -89,8 +89,8 @@ study_python_finance/
 │   │   └── loader.py           # YAML → モデル
 │   ├── grading/judge.py        # 採点（form 正規表現 + 動作チェック）
 │   ├── db/
-│   │   ├── models.py           # SQLAlchemy モデル
-│   │   └── repo.py             # Repository
+│   │   ├── models.py           # 永続レコードの dataclass 定義
+│   │   └── repo.py             # JSON ファイル永続化リポジトリ
 │   └── resources/
 │       ├── fonts/              # Inter / JetBrains Mono
 │       └── stickman/           # 4 種の SVG+PNG (normal / happy / sad / explain)

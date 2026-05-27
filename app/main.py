@@ -43,7 +43,7 @@ from .server import ServerContext, create_app
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONTENT_DIR = PROJECT_ROOT / "content" / "chapters"
 TESTS_DIR = PROJECT_ROOT / "content" / "tests"
-DB_PATH = PROJECT_ROOT / "progress.db"
+DB_PATH = PROJECT_ROOT / "progress.json"
 LOG_DIR = PROJECT_ROOT / "logs"
 
 
