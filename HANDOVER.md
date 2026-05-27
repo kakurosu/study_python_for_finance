@@ -48,7 +48,7 @@ git 管理しているのは **study_python_finance/** のみ（`.git` はこち
 | カーネル | jupyter_client + ipykernel（バックグラウンドで IPython kernel を起動して実行） |
 | データ層 | SQLAlchemy 2.0 + SQLite (`progress.db`) |
 | スキーマ | Pydantic 2.6 |
-| LLM (オプション) | anthropic SDK（`.env` の `ANTHROPIC_API_KEY` が設定されているときのみ「Ask AI」ボタン表示） |
+| LLM 教材 | openai SDK は章 24 (LLM API の使い方を学ぶ) の教材として依存に残置。アプリ自体の AI 機能はなし |
 | 数値計算 | numpy / pandas / matplotlib / scipy / scikit-learn / statsmodels |
 | 深層学習 | PyTorch（章 22 のみ）|
 
@@ -91,7 +91,6 @@ study_python_finance/
 │   ├── db/
 │   │   ├── models.py           # SQLAlchemy モデル
 │   │   └── repo.py             # Repository
-│   ├── llm/claude_client.py    # Claude API クライアント
 │   └── resources/
 │       ├── fonts/              # Inter / JetBrains Mono
 │       └── stickman/           # 4 種の SVG+PNG (normal / happy / sad / explain)
@@ -99,11 +98,11 @@ study_python_finance/
 │   ├── chapters/01_*.yaml 〜 26_*.yaml   # 26 章コンテンツ
 │   └── tests/phase_{a,b,c}_test.yaml     # 3 つの実力テスト
 ├── data/                       # サンプル CSV / HTML
-├── tests/                      # pytest（25 件）
-├── scripts/generate_chapters.py # 章 YAML 一括生成スクリプト（Claude API 使用）
+├── tests/                      # pytest（31 件）
+├── scripts/                    # 章 YAML 一括生成 / 整形スクリプト
 ├── pyproject.toml              # uv + 依存定義
-├── uv.lock                     # 157 パッケージの解決結果（コミット済み）
-├── .env.example                # ANTHROPIC_API_KEY サンプル
+├── uv.lock                     # 解決結果（コミット済み）
+├── .env.example                # 環境変数サンプル (proxy / UV_CACHE_DIR)
 └── README.md
 ```
 
@@ -161,11 +160,6 @@ study_python_finance/
 - 不正解時のみ "What failed" を `× <detail>` の形で表示
 - Output セクションは空のときは非表示
 - ChapterView のフッターも結果オーバーレイ表示中は隠す（二重 CTA 回避）
-
-### 「Ask AI」機能
-- `.env` の `ANTHROPIC_API_KEY` が設定されている場合のみ結果ページに表示
-- 200 字以内のヒント返答、答えは書かない指示でプロンプト固定
-- 同一コードへの再呼び出しはキャッシュ
 
 ---
 

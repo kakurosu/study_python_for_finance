@@ -100,10 +100,6 @@ tests/                # pytest（コアロジック）
 scripts/              # 章 YAML 一括生成スクリプト
 ```
 
-## オプション機能
-
-`.env` に `ANTHROPIC_API_KEY` を設定すると結果ページに「Ask AI」ボタンが表示され、Claude API による詳細解説が呼べます。未設定でも全機能オフラインで動作。
-
 ## ライセンス
 
 MIT

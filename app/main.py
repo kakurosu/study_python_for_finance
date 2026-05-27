@@ -38,7 +38,6 @@ from .content.loader import ContentError, load_chapters
 from .content.test_schemas import load_test_sets
 from .db.repo import Repository
 from .kernel.manager import KernelSession
-from .llm.claude_client import ClaudeClient
 from .server import ServerContext, create_app
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -95,7 +94,8 @@ def main() -> int:
 
     _configure_logging()
 
-    # Best-effort: pick up .env so ANTHROPIC_API_KEY is set.
+    # Best-effort: pick up .env for proxy settings / OPENAI_API_KEY (used
+    # in chapter 24's OpenAI SDK examples).
     try:
         from dotenv import load_dotenv
 
@@ -107,7 +107,6 @@ def main() -> int:
     repo = Repository(DB_PATH)
     user = repo.get_or_create_default_user()
     kernel = KernelSession()
-    _llm = ClaudeClient()  # noqa: F841 — wired through the chapter flows later
 
     try:
         chapters = load_chapters(CONTENT_DIR)

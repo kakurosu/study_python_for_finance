@@ -29,9 +29,8 @@ dependencies = [
     # Syntax highlighter (still used by the test/grading layer for
     # post-mortem formatting of submitted code).
     "Pygments>=2.17",
-    # LLM (optional — anthropic powers the in-app Ask AI feature; openai
-    # is taught in chapter 24)
-    "anthropic>=0.34",
+    # openai SDK is taught in chapter 24 (kept as a learning dependency;
+    # the in-app "Ask AI" feature that depended on anthropic was removed).
     "openai>=1.40",
     "python-dotenv>=1.0",
     # Numerics / data / charting
