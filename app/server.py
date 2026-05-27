@@ -23,6 +23,7 @@ client only needed a small shim, not a rewrite):
     POST /api/tests/record-result   → persist a finished test
     POST /api/progress              → save chapter / page progress
     POST /api/clear-learning-data   → wipe all progress for the active user
+    GET  /api/export-progress       → download progress.json as attachment
     GET  /api/events                → SSE feed (kernel state, etc.)
 """
 
@@ -41,6 +42,7 @@ from fastapi.responses import (
     FileResponse,
     HTMLResponse,
     JSONResponse,
+    Response,
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
@@ -605,6 +607,32 @@ def create_app(ctx: ServerContext) -> FastAPI:
         except Exception as e:
             log.exception("clear_user_data failed")
             return JSONResponse({"ok": False, "error": str(e)})
+
+    @app.get("/api/export-progress")
+    async def export_progress() -> Response:
+        """Download all stored progress for the active user as a JSON file.
+
+        Used to collect students' progress to a central machine for
+        offline aggregation. The response is delivered with a
+        ``Content-Disposition: attachment`` header so the browser saves
+        the file instead of rendering it.
+        """
+        try:
+            data = ctx.repo.export_user_data(ctx.user_id)
+        except Exception as e:
+            log.exception("export_user_data failed")
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+        body = json.dumps(data, ensure_ascii=False, indent=2)
+        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        filename = f"progress-{stamp}.json"
+        return Response(
+            content=body,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "no-store",
+            },
+        )
 
     # ------------------------------------------------------------------
     # SSE: kernel state stream

@@ -402,3 +402,33 @@ class Repository:
                 "submissions": s_count,
                 "test_results": t_count,
             }
+
+    # ------------------------------------------------------------------
+    # Export
+    # ------------------------------------------------------------------
+    def export_user_data(self, user_id: int) -> dict[str, Any]:
+        """Return a JSON-serialisable snapshot of everything stored for ``user_id``.
+
+        Used by ``GET /api/export-progress`` so an instructor can collect
+        progress files from each student's machine and aggregate them
+        offline. The returned dict re-uses the same field names as the
+        on-disk store, prefixed with metadata (``exported_at``, schema
+        version) for forward-compatibility.
+        """
+        with self._lock:
+            user = next(
+                (dict(r) for r in self._state["users"] if r["id"] == user_id),
+                None,
+            )
+            return {
+                "schema_version": self._state.get("schema_version", 1),
+                "exported_at": _dt_to_str(_now()),
+                "user": user,
+                "chapter_progress": [
+                    dict(r) for r in self._state["chapter_progress"] if r["user_id"] == user_id
+                ],
+                "cell_submissions": [
+                    dict(r) for r in self._state["cell_submissions"] if r["user_id"] == user_id
+                ],
+                "test_results": [dict(r) for r in self._state["test_results"] if r["user_id"] == user_id],
+            }

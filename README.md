@@ -92,13 +92,17 @@ app/
     vendor/katex/       数式描画 (ローカル同梱)
   resources/stickman/ # マスコット (PNG/SVG)
   resources/fonts/    # Inter / JetBrains Mono
-  content/, db/, grading/, kernel/, llm/   # ドメインロジック (Qt 非依存)
+  content/, db/, grading/, kernel/   # ドメインロジック (Qt 非依存)
 content/chapters/     # 章定義 YAML（学生は編集しない）
 content/tests/        # 実力テスト問題集
 data/                 # 各章のサンプル CSV / HTML
 tests/                # pytest（コアロジック）
 scripts/              # 章 YAML 一括生成スクリプト
 ```
+
+## 進捗のエクスポート
+
+設定画面の **「進捗を JSON でダウンロード」** ボタンから、章の進捗 / 演習の提出履歴 / 実力テストの結果を 1 ファイル（`progress-YYYYMMDD-HHMMSS.json`）にまとめて保存できます。講師にまとめて提出したり、別の PC に進捗を移すときに使えます。
 
 ## ライセンス
 
