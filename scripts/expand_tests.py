@@ -84,14 +84,12 @@ def expand_question(q: dict, phase: str) -> bool:
         existing_hints = q.get("hints") or []
         if len(existing_hints) < 3:
             shape_hint = (
-                f"使う API・記号を思い出して、形を絞り込もう。"
-                f" 答えはおそらく **{len(ans)} 文字程度** の式。"
+                f"使う API・記号を思い出して、形を絞り込もう。 答えはおそらく **{len(ans)} 文字程度** の式。"
             )
             mid_hint = f"パターンは `{_trim(ans)}` に似た形になる。"
             final_hint = f"答え: `{ans}`"
             q["hints"] = existing_hints + [
-                h for h in [shape_hint, mid_hint, final_hint]
-                if h not in existing_hints
+                h for h in [shape_hint, mid_hint, final_hint] if h not in existing_hints
             ]
             q["hints"] = q["hints"][:3] if len(q["hints"]) >= 3 else q["hints"] + [final_hint]
             # Ensure 3 distinct hints
@@ -110,10 +108,7 @@ def expand_question(q: dict, phase: str) -> bool:
         wh3 = sf.get("wrong_hint3", "")
         is_parrot = (wh1 == wh2 == wh3) or (wh1 == parrot and wh2 == parrot)
         if is_parrot or not wh1 or not wh2 or not wh3:
-            sf["wrong_hint1"] = (
-                "形をもう一度見直してみよう。"
-                " 使う関数・記号は授業で出てきたものだよ。"
-            )
+            sf["wrong_hint1"] = "形をもう一度見直してみよう。 使う関数・記号は授業で出てきたものだよ。"
             sf["wrong_hint2"] = f"パターンは `{_trim(ans)}` に近い形だね。"
             sf["wrong_hint3"] = f"答えは `{ans}` だよ。"
             changed = True

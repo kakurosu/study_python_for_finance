@@ -100,17 +100,11 @@ class Repository:
 
     def all_progress(self, user_id: int) -> list[ChapterProgress]:
         with self.session() as s:
-            return list(
-                s.scalars(
-                    select(ChapterProgress).where(ChapterProgress.user_id == user_id)
-                ).all()
-            )
+            return list(s.scalars(select(ChapterProgress).where(ChapterProgress.user_id == user_id)).all())
 
     def reset_all(self, user_id: int) -> None:
         with self.session() as s:
-            for row in s.scalars(
-                select(ChapterProgress).where(ChapterProgress.user_id == user_id)
-            ).all():
+            for row in s.scalars(select(ChapterProgress).where(ChapterProgress.user_id == user_id)).all():
                 s.delete(row)
             s.commit()
 
@@ -143,9 +137,7 @@ class Repository:
             )
             s.commit()
 
-    def submissions_for_page(
-        self, user_id: int, chapter_id: int, page_index: int
-    ) -> list[CellSubmission]:
+    def submissions_for_page(self, user_id: int, chapter_id: int, page_index: int) -> list[CellSubmission]:
         with self.session() as s:
             return list(
                 s.scalars(
@@ -195,23 +187,34 @@ class Repository:
         Returns a count summary so the caller can show "N rows removed".
         The user row itself is preserved.
         """
-        from sqlalchemy import delete  # local import to avoid cycles
         with self.session() as s:
-            p_count  = s.scalar(select(func.count()).select_from(ChapterProgress)
-                                .where(ChapterProgress.user_id == user_id)) or 0
-            s_count  = s.scalar(select(func.count()).select_from(CellSubmission)
-                                .where(CellSubmission.user_id == user_id)) or 0
-            t_count  = s.scalar(select(func.count()).select_from(TestResult)
-                                .where(TestResult.user_id == user_id)) or 0
+            p_count = (
+                s.scalar(
+                    select(func.count())
+                    .select_from(ChapterProgress)
+                    .where(ChapterProgress.user_id == user_id)
+                )
+                or 0
+            )
+            s_count = (
+                s.scalar(
+                    select(func.count()).select_from(CellSubmission).where(CellSubmission.user_id == user_id)
+                )
+                or 0
+            )
+            t_count = (
+                s.scalar(select(func.count()).select_from(TestResult).where(TestResult.user_id == user_id))
+                or 0
+            )
 
             s.execute(delete(ChapterProgress).where(ChapterProgress.user_id == user_id))
-            s.execute(delete(CellSubmission ).where(CellSubmission.user_id  == user_id))
-            s.execute(delete(TestResult     ).where(TestResult.user_id      == user_id))
+            s.execute(delete(CellSubmission).where(CellSubmission.user_id == user_id))
+            s.execute(delete(TestResult).where(TestResult.user_id == user_id))
             s.commit()
             return {
                 "chapter_progress": int(p_count),
-                "submissions":      int(s_count),
-                "test_results":     int(t_count),
+                "submissions": int(s_count),
+                "test_results": int(t_count),
             }
 
     def list_test_results(self, user_id: int) -> list[TestResult]:

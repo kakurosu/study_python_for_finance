@@ -10,7 +10,14 @@ authors = [{ name = "skokh" }]
 dependencies = [
     # Local HTTP server hosting the HTML/CSS/JS UI (replaces the previous
     # PyQt6 / QWebEngineView shell). The UI runs in the user's browser.
-    "fastapi>=0.110",
+    # Upper bound on fastapi sidesteps MAL-2026-4750: 0.136.x added an
+    # undocumented `fastar` typosquat dep to the [standard] extras group.
+    # We don't install [standard], but the pin keeps us safe even if a
+    # future contributor adds the extras flag.
+    "fastapi>=0.110,<0.136",
+    # starlette is a transitive of fastapi; pinned directly to dodge
+    # PYSEC-2026-161 (Host-header path injection, fixed in 1.0.1).
+    "starlette>=1.0.1",
     "uvicorn[standard]>=0.27",
     # Jupyter kernel backend
     "jupyter_client>=8.6",

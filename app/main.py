@@ -51,7 +51,10 @@ LOG_DIR = PROJECT_ROOT / "logs"
 def _configure_logging() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     handler = RotatingFileHandler(
-        LOG_DIR / "app.log", maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8",
+        LOG_DIR / "app.log",
+        maxBytes=5 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
     )
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     handler.setFormatter(fmt)
@@ -85,12 +88,9 @@ def _print_banner(url: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="study-python")
-    parser.add_argument("--host", default="127.0.0.1",
-                        help="listen address (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8765,
-                        help="port (default: 8765; 0 = pick free port)")
-    parser.add_argument("--no-browser", action="store_true",
-                        help="don't open the system browser")
+    parser.add_argument("--host", default="127.0.0.1", help="listen address (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=8765, help="port (default: 8765; 0 = pick free port)")
+    parser.add_argument("--no-browser", action="store_true", help="don't open the system browser")
     args = parser.parse_args()
 
     _configure_logging()
@@ -98,6 +98,7 @@ def main() -> int:
     # Best-effort: pick up .env so ANTHROPIC_API_KEY is set.
     try:
         from dotenv import load_dotenv
+
         load_dotenv(PROJECT_ROOT / ".env")
     except ImportError:
         pass
@@ -120,8 +121,7 @@ def main() -> int:
         print(f"[warn] テスト読み込み警告: {e}", file=sys.stderr)
         test_sets = {}
     if not chapters:
-        print(f"[warn] {CONTENT_DIR} に章ファイル(YAML)が見つかりません。",
-              file=sys.stderr)
+        print(f"[warn] {CONTENT_DIR} に章ファイル(YAML)が見つかりません。", file=sys.stderr)
 
     # ----- Build the FastAPI app -----
     ctx = ServerContext(chapters, repo, user.id, kernel, test_sets)
@@ -197,6 +197,7 @@ def _install_sigint_handler() -> None:
     # on a second Ctrl+C is nice in case the kernel hangs.
     def _handler(signum, frame):  # noqa: ANN001
         sys.exit(0)
+
     with contextlib.suppress(Exception):
         signal.signal(signal.SIGINT, _handler)
 

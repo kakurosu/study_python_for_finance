@@ -34,17 +34,37 @@ import re
 from pathlib import Path
 
 MAPPING = {
-    1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10,
+    1: 1,
+    2: 2,
+    3: 3,
+    4: 4,
+    5: 5,
+    6: 6,
+    7: 7,
+    8: 8,
+    9: 9,
+    10: 10,
     27: 11,
-    11: 12, 12: 13, 13: 14, 14: 15,
+    11: 12,
+    12: 13,
+    13: 14,
+    14: 15,
     28: 16,
-    15: 17, 16: 18, 17: 19, 18: 20, 19: 21,
+    15: 17,
+    16: 18,
+    17: 19,
+    18: 20,
+    19: 21,
     29: 22,
-    20: 23, 21: 24, 22: 25,
+    20: 23,
+    21: 24,
+    22: 25,
     30: 26,
-    23: 27, 24: 28,
+    23: 27,
+    24: 28,
     31: 29,
-    25: 30, 26: 31,
+    25: 30,
+    26: 31,
     32: 32,
 }
 
@@ -75,11 +95,12 @@ def main() -> None:
         # Rewrite top-level "id: NN" line. Anchored at start-of-line.
         body = re.sub(
             r"^(id:\s*)\d+(\s*$)",
-            lambda m: f"{m.group(1)}{new_id}{m.group(2)}",
+            lambda m, _new_id=new_id: f"{m.group(1)}{_new_id}{m.group(2)}",
             body,
             count=1,
             flags=re.MULTILINE,
         )
+
         # Rewrite prerequisites list. Looks like:
         #   prerequisites: [1, 2, 3]
         def _remap_list(match: re.Match[str]) -> str:
@@ -93,6 +114,7 @@ def main() -> None:
                 except ValueError:
                     new_parts.append(p)
             return f"prerequisites: [{', '.join(new_parts)}]"
+
         body = re.sub(
             r"prerequisites:\s*\[([^\]]*)\]",
             _remap_list,

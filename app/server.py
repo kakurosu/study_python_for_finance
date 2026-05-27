@@ -196,7 +196,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app = FastAPI(
         title="Study.Py — Finance",
         version="0.6.0",
-        docs_url=None,           # hide /docs from the loopback UI
+        docs_url=None,  # hide /docs from the loopback UI
         redoc_url=None,
         openapi_url=None,
     )
@@ -258,23 +258,27 @@ def create_app(ctx: ServerContext) -> FastAPI:
         try:
             for r in ctx.repo.list_test_results(ctx.user_id):
                 ts = ctx.test_sets.get(r.test_id)
-                test_results.append({
-                    "date": r.finished_at.strftime("%Y-%m-%d") if r.finished_at else "",
-                    "test_id": r.test_id,
-                    "title": ts.title if ts else r.test_id,
-                    "score": int(r.score / max(r.total, 1) * 100),
-                    "pass": (r.score / max(r.total, 1)) >= 0.6,
-                    "duration_sec": r.duration_sec,
-                })
+                test_results.append(
+                    {
+                        "date": r.finished_at.strftime("%Y-%m-%d") if r.finished_at else "",
+                        "test_id": r.test_id,
+                        "title": ts.title if ts else r.test_id,
+                        "score": int(r.score / max(r.total, 1) * 100),
+                        "pass": (r.score / max(r.total, 1)) >= 0.6,
+                        "duration_sec": r.duration_sec,
+                    }
+                )
         except Exception:
             log.exception("test_results bootstrap failed")
 
-        return JSONResponse({
-            "chapters": chapters,
-            "progress": progress,
-            "testSets": test_sets,
-            "testResults": test_results,
-        })
+        return JSONResponse(
+            {
+                "chapters": chapters,
+                "progress": progress,
+                "testSets": test_sets,
+                "testResults": test_results,
+            }
+        )
 
     # ------------------------------------------------------------------
     # API: chapter detail
@@ -287,62 +291,70 @@ def create_app(ctx: ServerContext) -> FastAPI:
         pages: list[dict[str, Any]] = []
         for p in ch.pages:
             if isinstance(p, SamplePage):
-                pages.append({
-                    "kind": "sample",
-                    "title": p.title,
-                    "markdown": p.markdown,
-                    "sample_code": p.sample_code,
-                    "runnable": p.runnable,
-                    "runner": p.runner,
-                    "expected_output": p.expected_output,
-                    "stickman": p.stickman,
-                    "stickman_speech": p.stickman_speech,
-                })
+                pages.append(
+                    {
+                        "kind": "sample",
+                        "title": p.title,
+                        "markdown": p.markdown,
+                        "sample_code": p.sample_code,
+                        "runnable": p.runnable,
+                        "runner": p.runner,
+                        "expected_output": p.expected_output,
+                        "stickman": p.stickman,
+                        "stickman_speech": p.stickman_speech,
+                    }
+                )
             elif isinstance(p, ExercisePage):
-                pages.append({
-                    "kind": "exercise",
-                    "title": p.title,
-                    "prompt": p.prompt,
-                    "code_template": p.code_template,
-                    "blanks": [
-                        {
-                            "id": b.id,
-                            "placeholder": b.placeholder,
-                            "width": b.width,
-                            "canonical_answer": b.canonical_answer,
-                            "hint": b.hint,
-                        }
-                        for b in p.blanks
-                    ],
-                    "hints": p.hints,
-                    "feedback": {
-                        "correct": p.stickman_feedback.correct,
-                        "wrong_hint1": p.stickman_feedback.wrong_hint1,
-                        "wrong_hint2": p.stickman_feedback.wrong_hint2,
-                        "wrong_hint3": p.stickman_feedback.wrong_hint3,
-                    },
-                })
+                pages.append(
+                    {
+                        "kind": "exercise",
+                        "title": p.title,
+                        "prompt": p.prompt,
+                        "code_template": p.code_template,
+                        "blanks": [
+                            {
+                                "id": b.id,
+                                "placeholder": b.placeholder,
+                                "width": b.width,
+                                "canonical_answer": b.canonical_answer,
+                                "hint": b.hint,
+                            }
+                            for b in p.blanks
+                        ],
+                        "hints": p.hints,
+                        "feedback": {
+                            "correct": p.stickman_feedback.correct,
+                            "wrong_hint1": p.stickman_feedback.wrong_hint1,
+                            "wrong_hint2": p.stickman_feedback.wrong_hint2,
+                            "wrong_hint3": p.stickman_feedback.wrong_hint3,
+                        },
+                    }
+                )
             elif isinstance(p, ReadingPage):
-                pages.append({
-                    "kind": "reading",
-                    "title": p.title,
-                    "prompt": p.prompt,
-                    "code": p.code,
-                    "code_file_label": p.code_file_label,
-                    "choices": list(p.choices),
-                    "explanation": p.explanation,
-                    "stickman": p.stickman,
-                    "stickman_speech": p.stickman_speech,
-                })
+                pages.append(
+                    {
+                        "kind": "reading",
+                        "title": p.title,
+                        "prompt": p.prompt,
+                        "code": p.code,
+                        "code_file_label": p.code_file_label,
+                        "choices": list(p.choices),
+                        "explanation": p.explanation,
+                        "stickman": p.stickman,
+                        "stickman_speech": p.stickman_speech,
+                    }
+                )
             else:
                 pages.append({"kind": "unknown"})
-        return JSONResponse({
-            "id": ch.id,
-            "phase": ch.phase,
-            "title": ch.title,
-            "learning_goals": list(ch.learning_goals),
-            "pages": pages,
-        })
+        return JSONResponse(
+            {
+                "id": ch.id,
+                "phase": ch.phase,
+                "title": ch.title,
+                "learning_goals": list(ch.learning_goals),
+                "pages": pages,
+            }
+        )
 
     # ------------------------------------------------------------------
     # API: run code
@@ -352,13 +364,15 @@ def create_app(ctx: ServerContext) -> FastAPI:
         try:
             res = await asyncio.to_thread(ctx.kernel.execute, req.code, 15)
         except Exception as e:
-            return JSONResponse({
-                "status": "error",
-                "stdout": "",
-                "stderr": str(e),
-                "error_name": "RuntimeError",
-                "error_value": str(e),
-            })
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "stdout": "",
+                    "stderr": str(e),
+                    "error_name": "RuntimeError",
+                    "error_value": str(e),
+                }
+            )
         body = res.stderr or ""
         if res.status != "ok":
             parts: list[str] = []
@@ -372,13 +386,15 @@ def create_app(ctx: ServerContext) -> FastAPI:
                 body = (body + "\n\n" + detail).strip() if body else detail
             if not body:
                 body = f"{res.status}: 詳細不明"
-        return JSONResponse({
-            "status": res.status,
-            "stdout": res.stdout or "",
-            "stderr": body,
-            "error_name": res.error_name,
-            "error_value": res.error_value,
-        })
+        return JSONResponse(
+            {
+                "status": res.status,
+                "stdout": res.stdout or "",
+                "stderr": body,
+                "error_name": res.error_name,
+                "error_value": res.error_value,
+            }
+        )
 
     # ------------------------------------------------------------------
     # API: grading
@@ -393,19 +409,21 @@ def create_app(ctx: ServerContext) -> FastAPI:
             return JSONResponse({"ok": False, "error": "not an exercise page"})
         try:
             gr = await asyncio.to_thread(grade_exercise, page, req.answers, ctx.kernel)
-            return JSONResponse({
-                "ok": True,
-                "passed": gr.overall_passed,
-                "form_passed": gr.form_passed,
-                "failed_blanks": list(gr.failed_blanks),
-                "assembled_code": gr.assembled_code,
-                "stdout": gr.execution.stdout if gr.execution else "",
-                "stderr": gr.execution.stderr if gr.execution else "",
-                "feedback": {
-                    "correct": page.stickman_feedback.correct,
-                    "wrong_hint1": page.stickman_feedback.wrong_hint1,
-                },
-            })
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "passed": gr.overall_passed,
+                    "form_passed": gr.form_passed,
+                    "failed_blanks": list(gr.failed_blanks),
+                    "assembled_code": gr.assembled_code,
+                    "stdout": gr.execution.stdout if gr.execution else "",
+                    "stderr": gr.execution.stderr if gr.execution else "",
+                    "feedback": {
+                        "correct": page.stickman_feedback.correct,
+                        "wrong_hint1": page.stickman_feedback.wrong_hint1,
+                    },
+                }
+            )
         except Exception as e:
             log.exception("grade_exercise failed")
             return JSONResponse({"ok": False, "error": str(e)})
@@ -420,12 +438,14 @@ def create_app(ctx: ServerContext) -> FastAPI:
             return JSONResponse({"ok": False, "error": "not a reading page"})
         try:
             gr = grade_reading(page, req.selected)
-            return JSONResponse({
-                "ok": True,
-                "passed": gr.overall_passed,
-                "correct_index": page.correct_index,
-                "explanation": page.explanation,
-            })
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "passed": gr.overall_passed,
+                    "correct_index": page.correct_index,
+                    "explanation": page.explanation,
+                }
+            )
         except Exception as e:
             log.exception("grade_reading failed")
             return JSONResponse({"ok": False, "error": str(e)})
@@ -456,17 +476,19 @@ def create_app(ctx: ServerContext) -> FastAPI:
         for ch in ctx.chapters:
             for idx, p in enumerate(ch.pages):
                 if isinstance(p, ReadingPage):
-                    items.append({
-                        "chapterId": ch.id,
-                        "phase": ch.phase,
-                        "chapterTitle": ch.title,
-                        "pageIndex": idx,
-                        "title": p.title,
-                        "prompt": p.prompt,
-                        "code": p.code,
-                        "codeFileLabel": p.code_file_label,
-                        "choices": list(p.choices),
-                    })
+                    items.append(
+                        {
+                            "chapterId": ch.id,
+                            "phase": ch.phase,
+                            "chapterTitle": ch.title,
+                            "pageIndex": idx,
+                            "title": p.title,
+                            "prompt": p.prompt,
+                            "code": p.code,
+                            "codeFileLabel": p.code_file_label,
+                            "choices": list(p.choices),
+                        }
+                    )
         return JSONResponse({"problems": items})
 
     # ------------------------------------------------------------------
@@ -494,15 +516,17 @@ def create_app(ctx: ServerContext) -> FastAPI:
             }
             for q in ts.questions
         ]
-        return JSONResponse({
-            "id": ts.id,
-            "title": ts.title,
-            "description": ts.description,
-            "phase": ts.phase,
-            "time_limit_minutes": ts.time_limit_minutes,
-            "pass_score": ts.pass_score,
-            "questions": questions,
-        })
+        return JSONResponse(
+            {
+                "id": ts.id,
+                "title": ts.title,
+                "description": ts.description,
+                "phase": ts.phase,
+                "time_limit_minutes": ts.time_limit_minutes,
+                "pass_score": ts.pass_score,
+                "questions": questions,
+            }
+        )
 
     @app.post("/api/tests/{test_id}/grade")
     async def test_grade(test_id: str, req: GradeTestRequest) -> JSONResponse:
@@ -511,16 +535,21 @@ def create_app(ctx: ServerContext) -> FastAPI:
             return JSONResponse({"ok": False, "error": "test / question not found"})
         try:
             gr = await asyncio.to_thread(
-                grade_exercise, ts.questions[req.q_index], req.answers, ctx.kernel,
+                grade_exercise,
+                ts.questions[req.q_index],
+                req.answers,
+                ctx.kernel,
             )
-            return JSONResponse({
-                "ok": True,
-                "passed": gr.overall_passed,
-                "form_passed": gr.form_passed,
-                "failed_blanks": list(gr.failed_blanks),
-                "stdout": gr.execution.stdout if gr.execution else "",
-                "stderr": gr.execution.stderr if gr.execution else "",
-            })
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "passed": gr.overall_passed,
+                    "form_passed": gr.form_passed,
+                    "failed_blanks": list(gr.failed_blanks),
+                    "stdout": gr.execution.stdout if gr.execution else "",
+                    "stderr": gr.execution.stderr if gr.execution else "",
+                }
+            )
         except Exception as e:
             log.exception("test_grade failed")
             return JSONResponse({"ok": False, "error": str(e)})

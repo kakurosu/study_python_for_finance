@@ -93,9 +93,7 @@ class ClaudeClient:
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_msg}],
             )
-            text_parts = [
-                block.text for block in resp.content if getattr(block, "type", None) == "text"
-            ]
+            text_parts = [block.text for block in resp.content if getattr(block, "type", None) == "text"]
             text = "\n".join(text_parts).strip()
             if not text:
                 text = "（応答が空でした）"

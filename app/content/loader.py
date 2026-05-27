@@ -49,12 +49,10 @@ def load_chapters(directory: Path) -> list[Chapter]:
     chapters = [load_chapter(p) for _, p in files]
     # Sanity: chapter ids should be unique and equal to file prefix
     seen: set[int] = set()
-    for prefix_pair, ch in zip(files, chapters):
+    for prefix_pair, ch in zip(files, chapters, strict=True):
         prefix, p = prefix_pair
         if ch.id != prefix:
-            raise ContentError(
-                f"{p.name}: chapter id={ch.id} does not match file prefix {prefix:02d}"
-            )
+            raise ContentError(f"{p.name}: chapter id={ch.id} does not match file prefix {prefix:02d}")
         if ch.id in seen:
             raise ContentError(f"duplicate chapter id: {ch.id}")
         seen.add(ch.id)

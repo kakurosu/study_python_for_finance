@@ -22,7 +22,7 @@ class Base(DeclarativeBase):
     pass
 
 
-class ChapterStatus(str, enum.Enum):
+class ChapterStatus(enum.StrEnum):
     not_started = "not_started"
     in_progress = "in_progress"
     completed = "completed"
@@ -36,7 +36,9 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     progress: Mapped[list[ChapterProgress]] = relationship(back_populates="user", cascade="all,delete-orphan")
-    submissions: Mapped[list[CellSubmission]] = relationship(back_populates="user", cascade="all,delete-orphan")
+    submissions: Mapped[list[CellSubmission]] = relationship(
+        back_populates="user", cascade="all,delete-orphan"
+    )
     test_results: Mapped[list[TestResult]] = relationship(back_populates="user", cascade="all,delete-orphan")
 
 
@@ -48,9 +50,7 @@ class ChapterProgress(Base):
     chapter_id: Mapped[int] = mapped_column(Integer, index=True)
     status: Mapped[ChapterStatus] = mapped_column(Enum(ChapterStatus), default=ChapterStatus.not_started)
     last_page_index: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     user: Mapped[User] = relationship(back_populates="progress")
 
