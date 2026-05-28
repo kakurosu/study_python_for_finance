@@ -190,7 +190,7 @@ class Repository:
         if not self._path.exists():
             return _empty_state()
         try:
-            data = json.loads(self._path.read_text(encoding="utf-8"))
+            raw = json.loads(self._path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             log.exception("progress store unreadable, starting fresh: %s", self._path)
             try:
@@ -200,6 +200,12 @@ class Repository:
             except OSError:
                 pass
             return _empty_state()
+        # json.loads returns Any; pin it to the dict shape the rest of the
+        # repository assumes (mypy --strict otherwise flags the implicit cast).
+        if not isinstance(raw, dict):
+            log.warning("progress store at %s was not a JSON object; resetting", self._path)
+            return _empty_state()
+        data: dict[str, Any] = raw
         # Be forgiving about missing keys so older state files still load.
         empty = _empty_state()
         for k, default in empty.items():

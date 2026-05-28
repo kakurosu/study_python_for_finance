@@ -34,7 +34,7 @@ import asyncio
 import json
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -310,16 +310,17 @@ def create_app(ctx: ServerContext) -> FastAPI:
     # immediately while it revalidates in the background, smoothing the
     # transition past the 1-hour boundary.
     @app.middleware("http")
-    async def _static_cache_headers(request: Request, call_next):
+    async def _static_cache_headers(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         response = await call_next(request)
         path = request.url.path
         is_static = path.startswith("/static/") or path.startswith("/resources/")
         # Only cache successful responses; never cache 4xx/5xx (a missing
         # asset shouldn't become a sticky 404 for an hour).
         if is_static and 200 <= response.status_code < 300:
-            response.headers["Cache-Control"] = (
-                "public, max-age=3600, stale-while-revalidate=86400"
-            )
+            response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
         return response
 
     # Static assets ---------------------------------------------------------
@@ -338,7 +339,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
 
     # Favicon (best-effort) ------------------------------------------------
     @app.get("/favicon.ico", response_model=None)
-    async def favicon():
+    async def favicon() -> Response:
         ico = WEB_DIR / "favicon.ico"
         if ico.exists():
             return FileResponse(str(ico))
@@ -830,7 +831,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     # ------------------------------------------------------------------
     @app.get("/api/events")
     async def events(request: Request) -> StreamingResponse:
-        async def stream():
+        async def stream() -> AsyncGenerator[str, None]:
             # Register this client for the auto-shutdown bookkeeping so the
             # server stops itself once every browser tab is closed.
             await ctx.client_connected()

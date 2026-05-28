@@ -111,7 +111,8 @@ def _pick_free_port(host: str, preferred: int) -> int:
                 pass
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, 0))
-        return s.getsockname()[1]
+        port: int = s.getsockname()[1]
+        return port
 
 
 def _display_host(bind_host: str) -> str:
