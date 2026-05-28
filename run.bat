@@ -166,6 +166,28 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM Defensive .pth cleanup -- see the matching block in setup.bat for
+REM the long version. Short version: Python 3.11 / 3.12's frozen
+REM site.py reads .pth files with the cp932 locale codec before
+REM -X utf8 / PYTHONUTF8 fully kicks in, so any .pth that carries
+REM the Japanese project path bricks the interpreter at start-up.
+REM --no-install-project should prevent these from being created in
+REM the first place, but we remove them anyway in case an older sync
+REM left one behind.
+set "_SITE_PACKAGES=!UV_PROJECT_ENVIRONMENT!\Lib\site-packages"
+if exist "!_SITE_PACKAGES!" (
+    for %%P in (
+        "_editable_impl_study_python_finance.pth"
+        "__editable__.study_python_finance.pth"
+        "__editable___study_python_finance_0_1_0_finder.py"
+        "study-python-finance.pth"
+        "study_python_finance.pth"
+        "easy-install.pth"
+    ) do (
+        if exist "!_SITE_PACKAGES!\%%~P" del /q "!_SITE_PACKAGES!\%%~P" 2>nul
+    )
+)
+
 REM Launch the app.
 REM `-X utf8` belt-and-suspenders alongside PYTHONUTF8=1. Some sub-
 REM processes (especially Python build hooks invoked through uv during a

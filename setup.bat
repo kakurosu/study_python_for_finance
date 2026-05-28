@@ -241,6 +241,35 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM Belt-and-suspenders: even with --no-install-project, an older uv
+REM version or a lingering install from a previous setup pattern may
+REM leave a project-specific .pth in the venv. Python 3.11 / 3.12's
+REM frozen site.py reads .pth files with the cp932 locale codec
+REM REGARDLESS of -X utf8 / PYTHONUTF8 (the encoding="locale" call in
+REM site.py runs from C before the UTF-8-mode plumbing is fully wired
+REM up for frozen modules), so a single .pth carrying a Japanese path
+REM stops the interpreter from starting at all.
+REM
+REM Force-remove all known editable-install .pth file names for this
+REM project. uv re-installs only what's in the lockfile on the next
+REM sync, so this is purely a cleanup against stale state.
+set "_SITE_PACKAGES=!UV_PROJECT_ENVIRONMENT!\Lib\site-packages"
+if exist "!_SITE_PACKAGES!" (
+    for %%P in (
+        "_editable_impl_study_python_finance.pth"
+        "__editable__.study_python_finance.pth"
+        "__editable___study_python_finance_0_1_0_finder.py"
+        "study-python-finance.pth"
+        "study_python_finance.pth"
+        "easy-install.pth"
+    ) do (
+        if exist "!_SITE_PACKAGES!\%%~P" (
+            echo       Removing stale install artefact: %%~P
+            del /q "!_SITE_PACKAGES!\%%~P" 2>nul
+        )
+    )
+)
+
 REM Step 3: Playwright browser detection (chapters 31 / 32).
 REM Chapter samples now use `chromium.launch(channel="chrome")` so they
 REM drive the system-installed Google Chrome directly. No download is
