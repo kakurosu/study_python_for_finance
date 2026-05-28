@@ -40,9 +40,25 @@ if exist ".env" (
     )
 )
 
+REM Auto-fallback: put the per-user .venv on local disk by default.
+REM This is critical when the project tree itself lives on OneDrive or a
+REM shared/network drive: a .venv co-located with the project breaks for
+REM three reasons - hardlink unsupported (slow copy), cross-user
+REM hardcoded paths (cannot be shared), and per-Python-version native
+REM extensions (every user needs their own anyway).
+if not defined UV_PROJECT_ENVIRONMENT (
+    set "UV_PROJECT_ENVIRONMENT=%LOCALAPPDATA%\studypy\venv"
+)
+REM Ensure the parent directory exists so uv can create the venv leaf.
+for %%P in ("!UV_PROJECT_ENVIRONMENT!") do set "_VENV_PARENT=%%~dpP"
+if not exist "!_VENV_PARENT!" mkdir "!_VENV_PARENT!" 2>nul
+
 echo.
 echo ============================================================
 echo  Study Python for Finance - Setup / Repair
+echo ============================================================
+echo  venv  : !UV_PROJECT_ENVIRONMENT!
+if defined UV_CACHE_DIR (echo  cache : !UV_CACHE_DIR!) else (echo  cache : ^(uv default: %%LOCALAPPDATA%%\uv\cache^))
 echo ============================================================
 echo.
 
@@ -58,21 +74,27 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Step 1: Remove existing .venv
-if exist ".venv" (
-    echo [1/3] Removing existing .venv ...
-    rmdir /s /q ".venv"
-    if exist ".venv" (
+REM Step 1: Remove existing venv (both the per-user path and any legacy
+REM in-project .venv left over from older setups).
+if exist "!UV_PROJECT_ENVIRONMENT!" (
+    echo [1/3] Removing existing venv at !UV_PROJECT_ENVIRONMENT! ...
+    rmdir /s /q "!UV_PROJECT_ENVIRONMENT!"
+    if exist "!UV_PROJECT_ENVIRONMENT!" (
         echo.
-        echo [ERROR] Failed to remove .venv.
+        echo [ERROR] Failed to remove venv.
         echo   - Another process ^(VS Code, editor, running app^) may be locking files.
-        echo   - If OneDrive is syncing, wait for it to finish and retry.
+        echo   - If on shared / cloud storage, wait for sync and retry.
         echo.
         pause
         exit /b 1
     )
 ) else (
-    echo [1/3] No existing .venv. Skipping removal.
+    echo [1/3] No existing venv at the target path. Skipping removal.
+)
+REM Also clean up a stray in-project .venv from previous installs.
+if exist ".venv" (
+    echo       Removing legacy in-project .venv ...
+    rmdir /s /q ".venv" 2>nul
 )
 
 REM Step 2: Recreate .venv with Python 3.13 and install dependencies

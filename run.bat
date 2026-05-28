@@ -41,11 +41,20 @@ if exist ".env" (
     )
 )
 
+REM Auto-fallback: put the per-user .venv on local disk by default.
+REM See setup.bat for the rationale. Must run AFTER the .env read so the
+REM user-supplied value takes precedence.
+if not defined UV_PROJECT_ENVIRONMENT (
+    set "UV_PROJECT_ENVIRONMENT=%LOCALAPPDATA%\studypy\venv"
+)
+for %%P in ("!UV_PROJECT_ENVIRONMENT!") do set "_VENV_PARENT=%%~dpP"
+if not exist "!_VENV_PARENT!" mkdir "!_VENV_PARENT!" 2>nul
+
 if defined HTTPS_PROXY            echo [proxy] HTTPS_PROXY=!HTTPS_PROXY!
 if defined HTTP_PROXY             echo [proxy] HTTP_PROXY=!HTTP_PROXY!
 if defined NO_PROXY               echo [proxy] NO_PROXY=!NO_PROXY!
 if defined UV_CACHE_DIR           echo [uv]    cache  = !UV_CACHE_DIR!
-if defined UV_PROJECT_ENVIRONMENT echo [uv]    .venv  = !UV_PROJECT_ENVIRONMENT!
+echo [uv]    venv   = !UV_PROJECT_ENVIRONMENT!
 
 REM Check uv
 where uv >nul 2>nul
