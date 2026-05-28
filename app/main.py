@@ -105,7 +105,7 @@ def _print_banner(url: str) -> None:
     print(f"  │  {url:<56}│")
     print(f"  └{bar}┘")
     print()
-    print("  Ctrl+C で停止します。ブラウザでこの URL を開いてください。")
+    print("  ブラウザを閉じるか Ctrl+C で停止します。")
     print()
 
 
@@ -114,6 +114,21 @@ def main() -> int:
     parser.add_argument("--host", default="127.0.0.1", help="listen address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8765, help="port (default: 8765; 0 = pick free port)")
     parser.add_argument("--no-browser", action="store_true", help="don't open the system browser")
+    parser.add_argument(
+        "--no-auto-shutdown",
+        action="store_true",
+        help=(
+            "Keep the server running even after the last browser tab closes. "
+            "By default, the server self-terminates 10s after every client disconnects "
+            "so the launching cmd.exe window closes cleanly when the user closes their browser."
+        ),
+    )
+    parser.add_argument(
+        "--shutdown-grace",
+        type=float,
+        default=10.0,
+        help="Seconds to wait after last client disconnect before shutting down (default: 10)",
+    )
     parser.add_argument(
         "--insecure-lan",
         action="store_true",
@@ -197,6 +212,16 @@ def main() -> int:
         lifespan="on",
     )
     server = uvicorn.Server(config)
+
+    # Wire up auto-shutdown so closing the last browser tab terminates the
+    # process. The grace period absorbs reloads and brief network blips.
+    if not args.no_auto_shutdown:
+        ctx.shutdown_grace_seconds = args.shutdown_grace
+
+        def _request_shutdown() -> None:
+            server.should_exit = True
+
+        ctx.shutdown_callback = _request_shutdown
 
     display_host = _display_host(args.host)
     url = f"http://{display_host}:{port}/"

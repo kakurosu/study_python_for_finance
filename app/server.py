@@ -34,6 +34,7 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -210,6 +211,62 @@ class ServerContext:
         self.kernel = kernel
         self.test_sets = test_sets
         self.events = EventBus()
+
+        # --- Auto-shutdown when the last browser tab closes ----------------
+        # SSE connections via /api/events are used as a liveness proxy: every
+        # open tab keeps one connection. When the last one drops we wait
+        # ``shutdown_grace_seconds`` (covers tab reload / brief disconnect),
+        # then invoke ``shutdown_callback`` to stop the uvicorn server.
+        # Set ``shutdown_callback`` from app/main.py after the Server is
+        # constructed; leave it None to disable auto-shutdown.
+        self._active_clients: int = 0
+        self._client_lock: asyncio.Lock = asyncio.Lock()
+        self._shutdown_task: asyncio.Task[None] | None = None
+        self._first_client_seen: bool = False
+        self.shutdown_callback: Callable[[], None] | None = None
+        self.shutdown_grace_seconds: float = 10.0
+
+    async def client_connected(self) -> None:
+        """Called when a new SSE subscriber arrives."""
+        async with self._client_lock:
+            self._active_clients += 1
+            self._first_client_seen = True
+            if self._shutdown_task is not None and not self._shutdown_task.done():
+                self._shutdown_task.cancel()
+                self._shutdown_task = None
+
+    async def client_disconnected(self) -> None:
+        """Called when an SSE subscriber goes away (close / reload / network)."""
+        async with self._client_lock:
+            self._active_clients = max(0, self._active_clients - 1)
+            if (
+                self._active_clients == 0
+                and self._first_client_seen
+                and self.shutdown_callback is not None
+                and (self._shutdown_task is None or self._shutdown_task.done())
+            ):
+                self._shutdown_task = asyncio.create_task(self._delayed_shutdown())
+
+    async def _delayed_shutdown(self) -> None:
+        try:
+            await asyncio.sleep(self.shutdown_grace_seconds)
+        except asyncio.CancelledError:
+            return
+        cb = self.shutdown_callback
+        if cb is None:
+            return
+        # Final guard: only fire if still nobody is connected.
+        async with self._client_lock:
+            if self._active_clients > 0:
+                return
+        log.info(
+            "No active browser clients for %.1fs — initiating graceful shutdown.",
+            self.shutdown_grace_seconds,
+        )
+        try:
+            cb()
+        except Exception:  # noqa: BLE001
+            log.exception("shutdown callback raised")
 
 
 # ---------------------------------------------------------------------------
@@ -742,6 +799,9 @@ def create_app(ctx: ServerContext) -> FastAPI:
     @app.get("/api/events")
     async def events(request: Request) -> StreamingResponse:
         async def stream():
+            # Register this client for the auto-shutdown bookkeeping so the
+            # server stops itself once every browser tab is closed.
+            await ctx.client_connected()
             q = await ctx.events.subscribe()
             try:
                 while True:
@@ -754,6 +814,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
                         yield ": keep-alive\n\n"
             finally:
                 await ctx.events.unsubscribe(q)
+                await ctx.client_disconnected()
 
         return StreamingResponse(
             stream(),
