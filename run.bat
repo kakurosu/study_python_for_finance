@@ -25,6 +25,13 @@ set "PYTHONIOENCODING=utf-8"
 set "PYTHONUTF8=1"
 set "UV_LINK_MODE=copy"
 
+REM Security: only use Python interpreters already installed on this
+REM machine; never let uv download CPython from python-build-standalone
+REM (Astral's GitHub-hosted prebuilt binaries). See setup.bat for the
+REM matching pre-flight check that fails fast if Python 3.13+ is missing.
+set "UV_PYTHON_DOWNLOADS=never"
+set "UV_PYTHON_PREFERENCE=only-system"
+
 REM Read .env for proxy / cache config
 if exist ".env" (
     for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
@@ -73,6 +80,27 @@ if errorlevel 1 (
     echo   Install via PowerShell:
     echo     powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 ^| iex"
     echo   Or: winget install astral-sh.uv
+    echo.
+    pause
+    exit /b 1
+)
+
+REM Check Python 3.13+ is installed (we disabled uv's automatic downloads).
+set "_PY313_OK="
+py -3.13 --version >nul 2>nul && set "_PY313_OK=1"
+if not defined _PY313_OK (
+    where python >nul 2>nul && (
+        python --version 2>nul | findstr /b /r "Python 3\.1[3-9]" >nul && set "_PY313_OK=1"
+    )
+)
+if not defined _PY313_OK (
+    echo.
+    echo [ERROR] Python 3.13+ not detected on this system.
+    echo   uv's automatic Python downloads are disabled for security.
+    echo   Install with one of:
+    echo     winget install Python.Python.3.13
+    echo     https://www.python.org/downloads/
+    echo   Then run setup.bat ^(first time^) or this script again.
     echo.
     pause
     exit /b 1

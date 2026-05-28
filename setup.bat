@@ -24,6 +24,14 @@ set "PYTHONIOENCODING=utf-8"
 set "PYTHONUTF8=1"
 set "UV_LINK_MODE=copy"
 
+REM Security: do NOT let uv download CPython from python-build-standalone
+REM (Astral's GitHub-hosted prebuilt interpreters). Restrict to Python
+REM installations already present on this system (PATH / py launcher /
+REM Windows registry under PEP 514). The user must install Python 3.13
+REM themselves via winget / the official python.org installer.
+set "UV_PYTHON_DOWNLOADS=never"
+set "UV_PYTHON_PREFERENCE=only-system"
+
 REM Read .env for proxy / cache config
 if exist ".env" (
     for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
@@ -64,7 +72,7 @@ if defined STUDYPY_DATA_DIR (echo  data  : !STUDYPY_DATA_DIR!) else (echo  data 
 echo ============================================================
 echo.
 
-REM Step 0: Check uv
+REM Step 0a: Check uv
 where uv >nul 2>nul
 if errorlevel 1 (
     echo [ERROR] uv command not found in PATH.
@@ -72,6 +80,31 @@ if errorlevel 1 (
     echo     powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 ^| iex"
     echo   Or: winget install astral-sh.uv
     echo.
+    pause
+    exit /b 1
+)
+
+REM Step 0b: Check Python 3.13+ is installed. We disabled uv's automatic
+REM Python downloads above, so we must verify the interpreter is on disk
+REM ourselves and give the user a precise error if not.
+set "_PY313_OK="
+py -3.13 --version >nul 2>nul && set "_PY313_OK=1"
+if not defined _PY313_OK (
+    where python >nul 2>nul && (
+        python --version 2>nul | findstr /b /r "Python 3\.1[3-9]" >nul && set "_PY313_OK=1"
+    )
+)
+if not defined _PY313_OK (
+    echo [ERROR] Python 3.13+ not detected on this system.
+    echo   uv's automatic Python downloads are intentionally disabled for
+    echo   security ^(UV_PYTHON_DOWNLOADS=never^), so Python must be
+    echo   installed locally first.
+    echo.
+    echo   Install via one of:
+    echo     winget install Python.Python.3.13
+    echo     https://www.python.org/downloads/   ^(official installer^)
+    echo.
+    echo   After installing, re-run this script.
     pause
     exit /b 1
 )
