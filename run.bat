@@ -53,8 +53,31 @@ if exist ".env" (
             if /i "!key!"=="HTTP_PROXY"             set "HTTP_PROXY=!val!"
             if /i "!key!"=="NO_PROXY"               set "NO_PROXY=!val!"
             if /i "!key!"=="UV_CACHE_DIR"           set "UV_CACHE_DIR=!val!"
+            if /i "!key!"=="UV_CACHE_SEED_DIR"      set "UV_CACHE_SEED_DIR=!val!"
             if /i "!key!"=="UV_PROJECT_ENVIRONMENT" set "UV_PROJECT_ENVIRONMENT=!val!"
             if /i "!key!"=="STUDYPY_DATA_DIR"       set "STUDYPY_DATA_DIR=!val!"
+        )
+    )
+)
+
+REM Optional: bootstrap the local uv cache from a shared seed once.
+REM See setup.bat for the full explanation. run.bat also does this so a
+REM user who skips setup.bat (e.g. fresh PC, double-clicks run.bat
+REM straight away) still benefits from the seed.
+if defined UV_CACHE_SEED_DIR (
+    if defined UV_CACHE_DIR (
+        set "_LOCAL_CACHE=!UV_CACHE_DIR!"
+    ) else (
+        set "_LOCAL_CACHE=%LOCALAPPDATA%\uv\cache"
+    )
+    if exist "!UV_CACHE_SEED_DIR!\archive-v0" (
+        if not exist "!_LOCAL_CACHE!\archive-v0" (
+            echo [seed] First-run cache bootstrap from !UV_CACHE_SEED_DIR! ...
+            if not exist "!_LOCAL_CACHE!" mkdir "!_LOCAL_CACHE!" >nul 2>&1
+            robocopy "!UV_CACHE_SEED_DIR!" "!_LOCAL_CACHE!" /E /XD environments-v2 builds-v0 /R:1 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP
+            if errorlevel 8 (
+                echo [WARN] Seed copy reported errors; uv may need to use PyPI.
+            )
         )
     )
 )

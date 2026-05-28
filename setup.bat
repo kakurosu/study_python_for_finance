@@ -62,9 +62,60 @@ if exist ".env" (
             if /i "!key!"=="HTTP_PROXY"             set "HTTP_PROXY=!val!"
             if /i "!key!"=="NO_PROXY"               set "NO_PROXY=!val!"
             if /i "!key!"=="UV_CACHE_DIR"           set "UV_CACHE_DIR=!val!"
+            if /i "!key!"=="UV_CACHE_SEED_DIR"      set "UV_CACHE_SEED_DIR=!val!"
             if /i "!key!"=="UV_PROJECT_ENVIRONMENT" set "UV_PROJECT_ENVIRONMENT=!val!"
             if /i "!key!"=="STUDYPY_DATA_DIR"       set "STUDYPY_DATA_DIR=!val!"
         )
+    )
+)
+
+REM ---- Shared-cache bootstrap ---------------------------------------
+REM Setting UV_CACHE_DIR to a shared / read-only drive does NOT work:
+REM uv still needs to write build artefacts there (e.g. building
+REM pytweening from sdist), and the second user gets PermissionError.
+REM
+REM Instead, the *admin* runs setup.bat normally on a writable machine,
+REM then copies their %LOCALAPPDATA%\uv\cache to a shared location.
+REM Each subsequent user sets UV_CACHE_SEED_DIR in .env pointing at that
+REM copy. On first run we mirror the seed -> the user's LOCAL cache once
+REM with robocopy and run uv sync entirely against that local copy.
+REM After bootstrap, no further reads or writes against the shared seed.
+if defined UV_CACHE_SEED_DIR (
+    REM Resolve the per-user uv cache. If the user pinned UV_CACHE_DIR
+    REM in .env, honour it; otherwise use uv's documented default.
+    if defined UV_CACHE_DIR (
+        set "_LOCAL_CACHE=!UV_CACHE_DIR!"
+    ) else (
+        set "_LOCAL_CACHE=%LOCALAPPDATA%\uv\cache"
+    )
+    if exist "!UV_CACHE_SEED_DIR!\archive-v0" (
+        if not exist "!_LOCAL_CACHE!\archive-v0" (
+            echo.
+            echo [seed] Bootstrapping local uv cache from shared seed:
+            echo        src ^= !UV_CACHE_SEED_DIR!
+            echo        dst ^= !_LOCAL_CACHE!
+            echo        This one-time copy is ~1.5-2 GB and may take 5-15 minutes.
+            if not exist "!_LOCAL_CACHE!" mkdir "!_LOCAL_CACHE!" >nul 2>&1
+            REM /E    : include empty subdirectories
+            REM /XD   : skip per-machine state (environments-v2) and in-progress
+            REM         build temps (builds-v0) which are not portable.
+            REM /R:1 /W:1 : retry once with 1s wait on transient I/O hiccups.
+            REM /NFL /NDL /NJH /NJS /NC /NS /NP : quiet output.
+            robocopy "!UV_CACHE_SEED_DIR!" "!_LOCAL_CACHE!" /E /XD environments-v2 builds-v0 /R:1 /W:1 /NFL /NDL /NJH /NJS /NC /NS /NP
+            REM robocopy exit codes 0-7 are success ^(0 = no copy, 1 = copies,
+            REM 2 = extras, up to 7 combinations^); 8+ are real errors.
+            if errorlevel 8 (
+                echo [WARN] Seed copy reported errors. uv sync may need to
+                echo        fall back to PyPI for some packages.
+            ) else (
+                echo [seed] Local cache populated. Subsequent runs are offline-ready.
+            )
+        ) else (
+            echo [seed] Local uv cache already present at !_LOCAL_CACHE! - skipping copy.
+        )
+    ) else (
+        echo [seed] UV_CACHE_SEED_DIR is set but ^"!UV_CACHE_SEED_DIR!\archive-v0^" was not found.
+        echo        Skipping bootstrap; uv will fetch from PyPI as usual.
     )
 )
 
