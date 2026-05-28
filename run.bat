@@ -166,11 +166,19 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Launch the app
+REM Launch the app.
+REM `-X utf8` belt-and-suspenders alongside PYTHONUTF8=1. Some sub-
+REM processes (especially Python build hooks invoked through uv during a
+REM sync) may not inherit the env var on Windows, and Python 3.11 / 3.12
+REM still falls back to the cp932 locale codec for things like
+REM `open(path)` without an explicit `encoding=`. Passing the flag
+REM forces UTF-8 mode for the actual interpreter we launch, which is
+REM the one parsing chapter YAML, progress.json, and dependency
+REM metadata - none of those should ever fall back to cp932.
 echo.
 echo [2/2] Starting Study Python for Finance...
 echo.
-uv run python -m app.main
+uv run python -X utf8 -m app.main
 if errorlevel 1 (
     echo.
     echo [ERROR] App startup failed. Check logs\app.log for details.
