@@ -95,20 +95,27 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Check Python 3.13+ is installed (we disabled uv's automatic downloads).
-set "_PY313_OK="
-py -3.13 --version >nul 2>nul && set "_PY313_OK=1"
-if not defined _PY313_OK (
-    where python >nul 2>nul && (
-        python --version 2>nul | findstr /b /r "Python 3\.1[3-9]" >nul && set "_PY313_OK=1"
+REM Check Python 3.11+ is installed (we disabled uv's automatic downloads).
+REM See setup.bat for the rationale; the short story is that we now use
+REM --no-install-project so 3.11/3.12's cp932 .pth bug never fires.
+set "_PY_OK="
+for %%V in (3.11 3.12 3.13 3.14) do (
+    if not defined _PY_OK (
+        py -%%V --version >nul 2>nul && set "_PY_OK=1"
     )
 )
-if not defined _PY313_OK (
+if not defined _PY_OK (
+    where python >nul 2>nul && (
+        python --version 2>nul | findstr /b /r "Python 3\.1[1-9]" >nul && set "_PY_OK=1"
+    )
+)
+if not defined _PY_OK (
     echo.
-    echo [ERROR] Python 3.13+ not detected on this system.
+    echo [ERROR] Python 3.11+ not detected on this system.
     echo   uv's automatic Python downloads are disabled for security.
     echo   Install with one of:
-    echo     winget install Python.Python.3.13
+    echo     winget install Python.Python.3.11
+    echo     winget install Python.Python.3.13   ^(latest^)
     echo     https://www.python.org/downloads/
     echo   Then run setup.bat ^(first time^) or this script again.
     echo.
@@ -116,15 +123,15 @@ if not defined _PY313_OK (
     exit /b 1
 )
 
-REM Dependency sync (fast no-op if already up to date)
-REM   --python 3.13 forces uv to use Python 3.13; required because earlier
-REM   versions fail to read .pth files containing non-ASCII paths on
-REM   Japanese Windows (locale encoding fallback to cp932).
+REM Dependency sync (fast no-op if already up to date).
+REM   --no-install-project: don't create a project-specific .pth that
+REM     would contain the Japanese project path; this is what lets us
+REM     support Python 3.11 / 3.12. See setup.bat for the long version.
 echo.
 echo [1/2] Checking dependencies...
 echo       First run downloads 1.5-2 GB (PyTorch / Playwright).
 echo.
-uv sync --python 3.13 --link-mode=copy --extra deep --extra automation
+uv sync --link-mode=copy --no-install-project --extra deep --extra automation
 if errorlevel 1 (
     echo.
     echo [ERROR] uv sync failed.

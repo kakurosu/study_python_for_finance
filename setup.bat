@@ -103,24 +103,35 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Step 0b: Check Python 3.13+ is installed. We disabled uv's automatic
+REM Step 0b: Check Python 3.11+ is installed. We disabled uv's automatic
 REM Python downloads above, so we must verify the interpreter is on disk
 REM ourselves and give the user a precise error if not.
-set "_PY313_OK="
-py -3.13 --version >nul 2>nul && set "_PY313_OK=1"
-if not defined _PY313_OK (
-    where python >nul 2>nul && (
-        python --version 2>nul | findstr /b /r "Python 3\.1[3-9]" >nul && set "_PY313_OK=1"
+REM
+REM Python 3.11 is the minimum because pyproject.toml's requires-python.
+REM Older Python (3.11 / 3.12) used to fail when the project lived on a
+REM Japanese path because site.py read .pth files with the cp932 locale
+REM codec; we sidestep that by passing --no-install-project to uv (no
+REM project-specific .pth is created), so 3.11 is back on the menu.
+set "_PY_OK="
+for %%V in (3.11 3.12 3.13 3.14) do (
+    if not defined _PY_OK (
+        py -%%V --version >nul 2>nul && set "_PY_OK=1"
     )
 )
-if not defined _PY313_OK (
-    echo [ERROR] Python 3.13+ not detected on this system.
+if not defined _PY_OK (
+    where python >nul 2>nul && (
+        python --version 2>nul | findstr /b /r "Python 3\.1[1-9]" >nul && set "_PY_OK=1"
+    )
+)
+if not defined _PY_OK (
+    echo [ERROR] Python 3.11+ not detected on this system.
     echo   uv's automatic Python downloads are intentionally disabled for
     echo   security ^(UV_PYTHON_DOWNLOADS=never^), so Python must be
     echo   installed locally first.
     echo.
     echo   Install via one of:
-    echo     winget install Python.Python.3.13
+    echo     winget install Python.Python.3.11
+    echo     winget install Python.Python.3.13   ^(latest^)
     echo     https://www.python.org/downloads/   ^(official installer^)
     echo.
     echo   After installing, re-run this script.
@@ -151,13 +162,24 @@ if exist ".venv" (
     rmdir /s /q ".venv" 2>nul
 )
 
-REM Step 2: Recreate .venv with Python 3.13 and install dependencies
+REM Step 2: Recreate .venv (using any available Python 3.11+) and install
+REM dependencies.
+REM
+REM --no-install-project: do NOT install the project itself into the
+REM   venv as an editable install. Without this, uv creates a
+REM   _editable_impl_*.pth file that records the project path; when that
+REM   path contains Japanese characters (shared drive, etc.) Python
+REM   3.11 / 3.12's site.py blows up trying to decode it as cp932.
+REM   Skipping the editable install makes Python 3.11 work everywhere.
+REM   We invoke the app via `uv run python -m app.main` from the project
+REM   dir (run.bat does `pushd %~dp0`), so cwd is on sys.path and the
+REM   `app` package imports fine without an explicit install.
 echo.
-echo [2/3] Creating .venv with Python 3.13 and installing dependencies...
+echo [2/3] Creating venv and installing dependencies...
 echo       First run downloads 1.5-2 GB ^(PyTorch / Playwright^).
 echo       This may take 5-15 minutes.
 echo.
-uv sync --python 3.13 --link-mode=copy --extra deep --extra automation --extra dev
+uv sync --link-mode=copy --no-install-project --extra deep --extra automation --extra dev
 if errorlevel 1 (
     echo.
     echo [ERROR] uv sync failed.
