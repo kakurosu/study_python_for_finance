@@ -290,6 +290,38 @@ def create_app(ctx: ServerContext) -> FastAPI:
     async def _attach_loop() -> None:  # noqa: D401
         ctx.events.attach_loop(asyncio.get_running_loop())
 
+    # Cache headers for static assets ---------------------------------------
+    # When the project tree lives on a shared / network drive and dozens
+    # of clients hit the app at once, every CSS / JS / font request would
+    # otherwise round-trip through stat() against that drive (Starlette's
+    # StaticFiles uses last-modified validation). Telling the browser
+    # `max-age=3600` skips the conditional GET entirely for an hour, so a
+    # student who refreshes mid-session pays zero shared-drive I/O for
+    # the static assets that dominate page weight.
+    #
+    # Scope:
+    #   - /static/*   (HTML/CSS/JS/KaTeX, ~1.5MB on cold load)
+    #   - /resources/* (fonts, stickman images, ~1.7MB)
+    # NOT cached aggressively:
+    #   - /        (index.html; small, and we want updates to surface)
+    #   - /api/*   (dynamic JSON / SSE)
+    #
+    # `stale-while-revalidate` lets the browser serve cached content
+    # immediately while it revalidates in the background, smoothing the
+    # transition past the 1-hour boundary.
+    @app.middleware("http")
+    async def _static_cache_headers(request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        is_static = path.startswith("/static/") or path.startswith("/resources/")
+        # Only cache successful responses; never cache 4xx/5xx (a missing
+        # asset shouldn't become a sticky 404 for an hour).
+        if is_static and 200 <= response.status_code < 300:
+            response.headers["Cache-Control"] = (
+                "public, max-age=3600, stale-while-revalidate=86400"
+            )
+        return response
+
     # Static assets ---------------------------------------------------------
     app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
     app.mount(
