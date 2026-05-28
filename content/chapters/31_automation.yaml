@@ -37,7 +37,10 @@ pages:
       ```python
       from playwright.sync_api import sync_playwright
       with sync_playwright() as p:
-          browser = p.chromium.launch(headless=True)
+          # channel='chrome' を指定するとシステムにインストール済みの
+          # Google Chrome を使う。指定しない場合は Playwright バンドルの
+          # Chromium を使うので別途 `playwright install chromium` が必要。
+          browser = p.chromium.launch(channel="chrome", headless=True)
           page = browser.new_page()
           page.goto("https://example.com")
           page.fill("#username", "alice")
@@ -49,7 +52,7 @@ pages:
       template = """
       from playwright.sync_api import sync_playwright
       with sync_playwright() as p:
-          browser = p.chromium.launch(headless=True)
+          browser = p.chromium.launch(channel="chrome", headless=True)
           page = browser.new_page()
           page.goto(URL)
           browser.close()
@@ -166,7 +169,7 @@ pages:
       print("from playwright.sync_api import sync_playwright")
       print()
       print("with sync_playwright() as p:")
-      print("    browser = p.chromium.launch(headless=True)   # 画面非表示")
+      print("    browser = p.chromium.launch(channel=\"chrome\", headless=True)  # 画面非表示")
       print("    page    = browser.new_page()")
       print("    page.goto('https://example.com')")
       print("    page.wait_for_load_state('networkidle')      # 完全読込まで待機")

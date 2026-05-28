@@ -149,17 +149,29 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Step 3: Playwright browser install (optional, used by chapter 26)
+REM Step 3: Playwright browser detection (chapters 31 / 32).
+REM Chapter samples now use `chromium.launch(channel="chrome")` so they
+REM drive the system-installed Google Chrome directly. No download is
+REM needed when Chrome is already on the machine. If Chrome is missing
+REM we just warn -- the rest of the curriculum is fully usable, and
+REM students who want to run the Playwright demos can install Chrome
+REM from https://www.google.com/chrome/ afterwards.
 echo.
-echo [3/3] Installing Playwright Chromium ^(for chapter 26, about 200MB^)...
-echo       You can press Ctrl+C to skip; main features will still work.
-echo.
-uv run playwright install chromium
-if errorlevel 1 (
-    echo.
-    echo [WARN] Playwright install failed, but core features are unaffected.
-    echo        Run "uv run playwright install chromium" later if you need chapter 26.
-    echo.
+echo [3/3] Checking for Google Chrome ^(used by chapter 31 / 32 examples^)...
+set "_CHROME_FOUND="
+if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "_CHROME_FOUND=1"
+if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "_CHROME_FOUND=1"
+if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" set "_CHROME_FOUND=1"
+if defined _CHROME_FOUND (
+    echo       OK: system Chrome detected. Playwright will use it via
+    echo           channel="chrome" -- no extra download required.
+) else (
+    echo       INFO: Google Chrome was not found in the usual locations.
+    echo             Chapters 31 / 32 ^(Playwright examples^) will not run
+    echo             until Chrome is installed. The rest of the app works
+    echo             without it.
+    echo             Install from: https://www.google.com/chrome/
+    echo             Or: winget install Google.Chrome
 )
 
 echo.

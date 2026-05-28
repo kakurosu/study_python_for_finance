@@ -102,7 +102,8 @@ pages:
     **この問題の文法ポイント**
 
     - Playwright は **ブラウザを Python から操作** するライブラリ。`with sync_playwright()` でリソース管理。
-    - `p.chromium.launch(headless=True)` で Chromium を **画面非表示** で起動 (バッチ用)。
+    - `p.chromium.launch(channel="chrome", headless=True)` でシステム Chrome を **画面非表示** で起動 (バッチ用)。
+    - `channel` を省くと Playwright バンドルの Chromium を使う (別途 `playwright install chromium` が必要)。
     - `page.goto(url)` でアクセス、`page.content()` で HTML 取得、`page.close()` / `browser.close()` で終了。
 
     **読み方**: with ブロック内で browser → page → 操作 → close、の流れを追う。
@@ -113,7 +114,7 @@ pages:
   code: |
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(channel="chrome")
         page = browser.new_page()
         page.goto("https://example.com")
         content = page.content()
