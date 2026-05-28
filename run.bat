@@ -15,7 +15,17 @@ REM  For first time / repair: run setup.bat instead.
 REM ============================================================
 
 setlocal EnableDelayedExpansion
-cd /d "%~dp0"
+
+REM UTF-8 console + UNC-safe directory change. See setup.bat for details.
+chcp 65001 >nul
+pushd "%~dp0" 2>nul
+if errorlevel 1 (
+    echo [ERROR] Could not enter the script directory:
+    echo   %~dp0
+    echo Make sure the share is accessible and you have read permission.
+    pause
+    exit /b 1
+)
 
 REM Required env vars for Japanese Windows + OneDrive
 REM   PYTHONIOENCODING / PYTHONUTF8: avoid UnicodeEncodeError when
@@ -138,4 +148,5 @@ if errorlevel 1 (
     exit /b 1
 )
 
+popd
 endlocal

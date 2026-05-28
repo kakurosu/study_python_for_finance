@@ -34,7 +34,7 @@ import asyncio
 import json
 import logging
 import re
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -290,44 +290,37 @@ def create_app(ctx: ServerContext) -> FastAPI:
     async def _attach_loop() -> None:  # noqa: D401
         ctx.events.attach_loop(asyncio.get_running_loop())
 
-    # Cache headers for static assets ---------------------------------------
-    # When the project tree lives on a shared / network drive and dozens
-    # of clients hit the app at once, every CSS / JS / font request would
-    # otherwise round-trip through stat() against that drive (Starlette's
-    # StaticFiles uses last-modified validation). Telling the browser
-    # `max-age=3600` skips the conditional GET entirely for an hour, so a
-    # student who refreshes mid-session pays zero shared-drive I/O for
-    # the static assets that dominate page weight.
-    #
-    # Scope:
-    #   - /static/*   (HTML/CSS/JS/KaTeX, ~1.5MB on cold load)
-    #   - /resources/* (fonts, stickman images, ~1.7MB)
-    # NOT cached aggressively:
-    #   - /        (index.html; small, and we want updates to surface)
-    #   - /api/*   (dynamic JSON / SSE)
-    #
-    # `stale-while-revalidate` lets the browser serve cached content
-    # immediately while it revalidates in the background, smoothing the
-    # transition past the 1-hour boundary.
-    @app.middleware("http")
-    async def _static_cache_headers(
-        request: Request,
-        call_next: Callable[[Request], Awaitable[Response]],
-    ) -> Response:
-        response = await call_next(request)
-        path = request.url.path
-        is_static = path.startswith("/static/") or path.startswith("/resources/")
-        # Only cache successful responses; never cache 4xx/5xx (a missing
-        # asset shouldn't become a sticky 404 for an hour).
-        if is_static and 200 <= response.status_code < 300:
-            response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
-        return response
-
     # Static assets ---------------------------------------------------------
-    app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
+    # We use a small StaticFiles subclass to stamp Cache-Control on every
+    # successful response, instead of an @app.middleware("http")-based
+    # approach: FastAPI's BaseHTTPMiddleware wraps responses in a way that
+    # collapses streaming bodies into the parent stream, which collides
+    # with the way StaticFiles emits FileResponse chunks
+    # ("Response content longer than Content-Length"). Subclassing keeps
+    # the streaming response intact while still letting us decorate it.
+    #
+    # Why cache:
+    #   When the project tree lives on a shared / network drive and many
+    #   clients hit the app at once, every CSS / JS / font request would
+    #   otherwise round-trip through stat() against that drive (Starlette
+    #   uses last-modified validation). max-age=3600 skips the
+    #   conditional GET entirely for an hour; stale-while-revalidate
+    #   lets the browser serve cached bytes immediately while it
+    #   revalidates in the background past that boundary.
+    #
+    # Scope: only the /static and /resources mounts; the /api/* routes
+    # and "/" (index.html) keep their default no-cache behaviour.
+    class _CachedStaticFiles(StaticFiles):
+        async def get_response(self, path: str, scope: Any) -> Response:
+            response = await super().get_response(path, scope)
+            if 200 <= response.status_code < 300:
+                response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
+            return response
+
+    app.mount("/static", _CachedStaticFiles(directory=str(WEB_DIR)), name="static")
     app.mount(
         "/resources",
-        StaticFiles(directory=str(RESOURCES_DIR)),
+        _CachedStaticFiles(directory=str(RESOURCES_DIR)),
         name="resources",
     )
 

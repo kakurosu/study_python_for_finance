@@ -17,7 +17,26 @@ REM  For normal startup, use run.bat instead.
 REM ============================================================
 
 setlocal EnableDelayedExpansion
-cd /d "%~dp0"
+
+REM Switch the console to UTF-8 so any non-ASCII path the user runs us
+REM under (e.g. a shared folder named in Japanese) renders correctly in
+REM both our own echo lines and in subprocess output from uv / Python.
+REM This file itself is pure ASCII, so changing the codepage cannot
+REM break batch parsing.
+chcp 65001 >nul
+
+REM `pushd` (not `cd /d`) so the script also works when launched from a
+REM UNC path such as \\fileserver\share\study_python_finance. cmd refuses
+REM to set the cwd to a UNC string with `cd`; pushd transparently maps it
+REM to a temporary drive letter.
+pushd "%~dp0" 2>nul
+if errorlevel 1 (
+    echo [ERROR] Could not enter the script directory:
+    echo   %~dp0
+    echo Make sure the share is accessible and you have read permission.
+    pause
+    exit /b 1
+)
 
 REM Required env vars for Japanese Windows + OneDrive
 set "PYTHONIOENCODING=utf-8"
@@ -183,4 +202,5 @@ echo ============================================================
 echo.
 pause
 
+popd
 endlocal
