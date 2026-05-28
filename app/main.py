@@ -42,14 +42,44 @@ from .server import ServerContext, create_app
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONTENT_DIR = PROJECT_ROOT / "content" / "chapters"
 TESTS_DIR = PROJECT_ROOT / "content" / "tests"
-DB_PATH = PROJECT_ROOT / "progress.json"
-LOG_DIR = PROJECT_ROOT / "logs"
 
 
-def _configure_logging() -> None:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+def _resolve_data_dir() -> Path:
+    """Return the directory that holds per-user state (progress.json, logs/).
+
+    Resolution order:
+
+      1. ``STUDYPY_DATA_DIR`` env var (explicit override; required for
+         classroom-scale deployments where many users share the project
+         tree on a network drive).
+      2. ``PROJECT_ROOT`` if ``progress.json`` already exists there —
+         preserves the historical layout so single-user installs and
+         existing checkouts keep their data without manual migration.
+      3. ``%LOCALAPPDATA%\\studypy`` on Windows / ``~/.studypy`` elsewhere.
+         This is the recommended default for fresh shared-drive installs:
+         every user's writable state stays on their own machine, and the
+         project tree itself can be mounted read-only.
+    """
+    env_val = os.environ.get("STUDYPY_DATA_DIR")
+    if env_val:
+        return Path(env_val).expanduser()
+    if (PROJECT_ROOT / "progress.json").exists():
+        return PROJECT_ROOT
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home())
+        return Path(base) / "studypy"
+    return Path.home() / ".studypy"
+
+
+DATA_DIR = _resolve_data_dir()
+DB_PATH = DATA_DIR / "progress.json"
+LOG_DIR = DATA_DIR / "logs"
+
+
+def _configure_logging(log_dir: Path) -> None:
+    log_dir.mkdir(parents=True, exist_ok=True)
     handler = RotatingFileHandler(
-        LOG_DIR / "app.log",
+        log_dir / "app.log",
         maxBytes=5 * 1024 * 1024,
         backupCount=5,
         encoding="utf-8",
@@ -155,10 +185,10 @@ def main() -> int:
         )
         return 2
 
-    _configure_logging()
-
     # Best-effort: pick up .env for proxy settings / OPENAI_API_KEY (used
-    # in chapter 24's OpenAI SDK examples).
+    # in chapter 24's OpenAI SDK examples). Load this BEFORE re-resolving
+    # the data dir so STUDYPY_DATA_DIR coming from .env (not just the
+    # parent process env) is honoured.
     try:
         from dotenv import load_dotenv
 
@@ -166,8 +196,19 @@ def main() -> int:
     except ImportError:
         pass
 
+    # Re-resolve the writable data location now that .env has been loaded.
+    # The module-level DATA_DIR was computed at import time and may miss
+    # values that only appear in .env when the launcher does not export
+    # them up-front (the bundled run.bat / setup.bat both do, but a
+    # bare `uv run python -m app.main` would not).
+    data_dir = _resolve_data_dir()
+    db_path = data_dir / "progress.json"
+    log_dir = data_dir / "logs"
+
+    _configure_logging(log_dir)
+
     # ----- Load domain data -----
-    repo = Repository(DB_PATH)
+    repo = Repository(db_path)
     user = repo.get_or_create_default_user()
     kernel = KernelSession()
 

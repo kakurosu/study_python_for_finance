@@ -36,6 +36,7 @@ if exist ".env" (
             if /i "!key!"=="NO_PROXY"               set "NO_PROXY=!val!"
             if /i "!key!"=="UV_CACHE_DIR"           set "UV_CACHE_DIR=!val!"
             if /i "!key!"=="UV_PROJECT_ENVIRONMENT" set "UV_PROJECT_ENVIRONMENT=!val!"
+            if /i "!key!"=="STUDYPY_DATA_DIR"       set "STUDYPY_DATA_DIR=!val!"
         )
     )
 )
@@ -59,6 +60,7 @@ echo  Study Python for Finance - Setup / Repair
 echo ============================================================
 echo  venv  : !UV_PROJECT_ENVIRONMENT!
 if defined UV_CACHE_DIR (echo  cache : !UV_CACHE_DIR!) else (echo  cache : ^(uv default: %%LOCALAPPDATA%%\uv\cache^))
+if defined STUDYPY_DATA_DIR (echo  data  : !STUDYPY_DATA_DIR!) else (echo  data  : ^(auto: project root or %%LOCALAPPDATA%%\studypy^))
 echo ============================================================
 echo.
 

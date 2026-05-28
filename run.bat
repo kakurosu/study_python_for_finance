@@ -37,6 +37,7 @@ if exist ".env" (
             if /i "!key!"=="NO_PROXY"               set "NO_PROXY=!val!"
             if /i "!key!"=="UV_CACHE_DIR"           set "UV_CACHE_DIR=!val!"
             if /i "!key!"=="UV_PROJECT_ENVIRONMENT" set "UV_PROJECT_ENVIRONMENT=!val!"
+            if /i "!key!"=="STUDYPY_DATA_DIR"       set "STUDYPY_DATA_DIR=!val!"
         )
     )
 )
@@ -50,10 +51,18 @@ if not defined UV_PROJECT_ENVIRONMENT (
 for %%P in ("!UV_PROJECT_ENVIRONMENT!") do set "_VENV_PARENT=%%~dpP"
 if not exist "!_VENV_PARENT!" mkdir "!_VENV_PARENT!" 2>nul
 
+REM Per-user data dir (progress.json, logs). For a single-user install
+REM with an existing progress.json in the project tree, Python's
+REM _resolve_data_dir() keeps that location for back-compat; otherwise
+REM it falls back to %LOCALAPPDATA%\studypy. Set explicitly here only if
+REM you need every instance on this machine to share or split state.
+REM (Empty default - let Python pick the right path.)
+
 if defined HTTPS_PROXY            echo [proxy] HTTPS_PROXY=!HTTPS_PROXY!
 if defined HTTP_PROXY             echo [proxy] HTTP_PROXY=!HTTP_PROXY!
 if defined NO_PROXY               echo [proxy] NO_PROXY=!NO_PROXY!
 if defined UV_CACHE_DIR           echo [uv]    cache  = !UV_CACHE_DIR!
+if defined STUDYPY_DATA_DIR       echo [data]  dir    = !STUDYPY_DATA_DIR!
 echo [uv]    venv   = !UV_PROJECT_ENVIRONMENT!
 
 REM Check uv
