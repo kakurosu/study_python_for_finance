@@ -1095,6 +1095,15 @@ hr { border: none; height: 1px; background: var(--line-2); }
   line-height: 1.6;
 }
 .output__head { font-family: 'Inter', sans-serif; font-size: 10.5px; font-weight: 800; color: var(--ink-4); letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 8px; }
+.output__img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 10px 0;
+  background: #fff;
+  border: 1px solid var(--line-2);
+  border-radius: 2px;
+}
 
 /* Result reveal */
 .result {

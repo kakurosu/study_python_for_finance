@@ -518,6 +518,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
                     "stderr": str(e),
                     "error_name": "RuntimeError",
                     "error_value": str(e),
+                    "images": [],
                 }
             )
         body = res.stderr or ""
@@ -533,6 +534,13 @@ def create_app(ctx: ServerContext) -> FastAPI:
                 body = (body + "\n\n" + detail).strip() if body else detail
             if not body:
                 body = f"{res.status}: 詳細不明"
+        # Matplotlib (via the inline backend set up in KernelSession._warmup)
+        # publishes each figure as an image/png on iopub. Pass them through to
+        # the browser as base64 strings so chapters that draw charts actually
+        # show charts in the Output panel, not just stdout.
+        import base64 as _b64
+
+        images_b64 = [_b64.b64encode(p).decode("ascii") for p in res.images_png]
         return JSONResponse(
             {
                 "status": res.status,
@@ -540,6 +548,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
                 "stderr": body,
                 "error_name": res.error_name,
                 "error_value": res.error_value,
+                "images": images_b64,
             }
         )
 

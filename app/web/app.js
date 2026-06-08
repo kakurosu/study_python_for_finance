@@ -1325,17 +1325,26 @@ function renderOutput(target, result) {
   const status = result.status || 'ok';
   const stdout = escapeHtml(result.stdout || '');
   const stderr = escapeHtml(result.stderr || '');
+  // Inline-rendered matplotlib figures (base64 PNG strings).
+  const imagesHtml = Array.isArray(result.images) && result.images.length
+    ? result.images.map(b64 =>
+        `<img class="output__img" src="data:image/png;base64,${b64}" alt="matplotlib figure">`
+      ).join('')
+    : '';
   let body = '';
   if (status === 'ok') {
-    body = stdout
+    const textPart = stdout
       ? `<pre style="margin:0;font-family:inherit;white-space:pre-wrap;">${stdout}</pre>`
-      : '<span style="color:var(--ink-5)">（値を返すコードでは標準出力が出ません）</span>';
+      : (imagesHtml
+          ? ''
+          : '<span style="color:var(--ink-5)">（値を返すコードでは標準出力が出ません）</span>');
+    body = textPart + imagesHtml;
   } else {
     const en = result.error_name ? `<strong style="color:var(--accent-h);">${escapeHtml(result.error_name)}</strong>` : '';
     const ev = result.error_value ? ` <span>${escapeHtml(result.error_value)}</span>` : '';
     const head = (en || ev) ? `<div style="margin-bottom:6px;font-size:12.5px;">${en}${ev}</div>` : '';
     const detail = stderr || stdout || 'エラーが発生しました';
-    body = `${head}<pre style="margin:0;font-family:inherit;color:var(--accent-h);white-space:pre-wrap;max-height:240px;overflow:auto;font-size:11.5px;line-height:1.55;">${detail}</pre>`;
+    body = `${head}<pre style="margin:0;font-family:inherit;color:var(--accent-h);white-space:pre-wrap;max-height:240px;overflow:auto;font-size:11.5px;line-height:1.55;">${detail}</pre>${imagesHtml}`;
   }
   target.innerHTML = `<div class="output__head">${status === 'ok' ? 'Output' : 'Error'}</div>${body}`;
 }
