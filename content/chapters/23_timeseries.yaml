@@ -4,9 +4,11 @@ phase: D
 prerequisites: [15, 17]
 learning_goals:
   - "定常性・自己相関・ホワイトノイズ・ランダムウォークの違いを説明できる"
+  - "AR(1) の長期平均・分散・半減期を理解し、φ の値が挙動に与える影響を説明できる"
   - "ACF / PACF を使って ARMA(p, q) の次数候補を絞り込める"
   - "ADF 検定で単位根を判定し、差分階数 d を決められる"
-  - "statsmodels で AR / MA / ARMA / ARIMA モデルを推定し、残差の白色化を確認できる"
+  - "Box-Jenkins 方法論の 4 ステップで実データに ARIMA を当てられる"
+  - "statsmodels の summary 出力（係数・p 値・信頼区間）を読み解け、点予測と予測区間を区別して解釈できる"
 
 pages:
   # ─── 0. 時系列の基礎用語 ─────────────────────────────
@@ -72,22 +74,51 @@ pages:
     stickman: explain
     stickman_speech: "ホワイトノイズ・ランダムウォーク・AR(1) — まずこの 3 つの違いを身体で覚えよう。"
 
-  # ─── 1. AR(1) モデル ─────────────────────────────────
+  # ─── 1a. AR(1) モデル: 数学的性質 ─────────────────────
   - kind: sample
-    title: "AR(1): 自己回帰モデル"
+    title: "AR(1): 自己回帰モデルの数学的性質"
     markdown: |
-      ## 自己回帰モデル AR(p)
+      ## AR(1) モデル — 最も基本的な時系列モデル
 
-      過去 $p$ 個の自分自身で現在を説明するモデル。最も単純な AR(1) は:
+      過去 1 期の自分自身で現在を説明するモデル:
 
       $$ y_t = c + \phi\, y_{t-1} + \varepsilon_t,\quad \varepsilon_t \sim \mathcal{N}(0,\sigma^2) $$
 
       - $\phi$ (ファイ) は **過去の値をどれだけ引きずるか** を決める係数
-      - **$|\phi| < 1$** で定常 (平均回帰する)
-      - **$\phi = 1$** はランダムウォーク (非定常、単位根)
-      - **$\phi = 0$** はホワイトノイズ (過去と無相関)
-      - **$\phi$ が 1 に近い** ほど過去の値を強く引きずる
+      - $c$ は定数項 (drift)
       - $\varepsilon_t$ はホワイトノイズ (平均 0 の独立な誤差項)
+
+      ### φ の値ごとの挙動
+
+      | φ の値 | 系列の振る舞い | 例 |
+      |---|---|---|
+      | $\phi = 0$ | 過去と無相関 → ホワイトノイズと同じ | 公平なコイン投げ系列 |
+      | $0 < \phi < 1$ | **平均回帰** (mean reversion) する定常系列 | 金利スプレッド、ペアトレードの bp 差 |
+      | $\phi = 1$ | **ランダムウォーク** (単位根) — 非定常 | 株価の対数 (log price) |
+      | $\phi > 1$ | 発散 (爆発的に大きくなる) — 現実にはほぼ無い | — |
+      | $-1 < \phi < 0$ | 振動しながら平均回帰 | 在庫の在庫過剰⇄不足の振り子 |
+
+      ### 定常 AR(1) の 3 つの公式 ($|\phi| < 1$ のとき)
+
+      | 量 | 公式 | 意味 |
+      |---|---|---|
+      | 長期平均 (long-run mean) | $\mu = \dfrac{c}{1 - \phi}$ | 系列が長期的に戻っていく値 |
+      | 分散 (unconditional variance) | $\mathrm{Var}(y_t) = \dfrac{\sigma^2}{1 - \phi^2}$ | $\phi \to 1$ で爆発 → ランダムウォークの非定常性の数学的根拠 |
+      | 自己相関関数 (ACF) | $\rho(k) = \phi^{k}$ | ラグ $k$ ごとに指数的に減衰、$\phi$ が大きいほどゆっくり |
+
+      ### 平均回帰の半減期
+
+      AR(1) が長期平均から「半分の距離」まで戻る期間は:
+
+      $$ \text{half-life} = \dfrac{\ln(0.5)}{\ln(|\phi|)} $$
+
+      例: $\phi = 0.9$ なら半減期は約 6.6 期。$\phi = 0.5$ なら 1 期。
+      **金融実務**ではペアトレードのエントリ判断にこの数値を使います。
+
+      ### statsmodels の流儀
+
+      AR 多項式は **`[1, -φ]`** の符号反転形式で渡します。
+      これは AR モデルを「ラグ多項式」$(1 - \phi L)\,y_t = \varepsilon_t$ と書く慣習に由来します ($L$ はラグ演算子)。
 
       ### 一般化: AR(p)
 
@@ -101,13 +132,71 @@ pages:
       # statsmodels の AR 多項式は [1, -φ1, -φ2, ...] の符号反転形式
       ar_params = np.array([1, -0.7])    # φ = 0.7
       ma_params = np.array([1])          # MA なし
-      y = arma_generate_sample(ar_params, ma_params, nsample=100)
-      print("生成されたパス [先頭 5]:", y[:5].round(3))
-      print("平均             :", round(y.mean(), 4))
-      print("標準偏差          :", round(y.std(), 4))
+      y = arma_generate_sample(ar_params, ma_params, nsample=500)
+
+      phi = 0.7
+      sigma = 1.0          # 残差ε の標準偏差 (arma_generate_sample のデフォルト)
+      print("【 AR(1) φ = 0.7 の理論値 vs 標本値 】")
+      print(f"  長期平均 (理論)   : 0.0  (c=0 なので)")
+      print(f"  長期平均 (標本)   : {y.mean():.3f}")
+      print(f"  分散 (理論)       : {sigma**2 / (1 - phi**2):.3f}")
+      print(f"  分散 (標本)       : {y.var(ddof=1):.3f}")
+      # 半減期
+      half_life = np.log(0.5) / np.log(phi)
+      print(f"  半減期            : {half_life:.2f} 期")
+      print(f"  ρ(1) 理論 = φ^1   : {phi**1:.3f}")
+      print(f"  ρ(5) 理論 = φ^5   : {phi**5:.3f}")
     runnable: true
     stickman: explain
-    stickman_speech: "AR(1) は最重要の入門モデル。φ の符号反転だけ気をつけよう！"
+    stickman_speech: "φ から長期平均・分散・ACF・半減期がすべて出る — これが AR(1) の美しさ！"
+
+  # ─── 1b. AR(1) を可視化: 3 つの φ で挙動を見る ───────
+  - kind: sample
+    title: "AR(1) を可視化: φ ごとに挙動はどう違う?"
+    markdown: |
+      ## 3 つの φ で同じ乱数を回し、挙動の違いを目で見る
+
+      同じ $\varepsilon_t$ 系列を使って、$\phi = 0$ (ホワイトノイズ), $\phi = 0.5$ (穏やかな平均回帰),
+      $\phi = 0.95$ (強い引きずり) の 3 つを並べると、なぜ $\phi$ が「過去の引きずり度合い」と
+      呼ばれるかが直感的に分かります。
+
+      ### 観察ポイント
+
+      - **$\phi = 0$**: ジグザグでまったくトレンドなし。隣り合う点が完全に独立
+      - **$\phi = 0.5$**: 軽い「うねり」が出るが、すぐ 0 に戻る
+      - **$\phi = 0.95$**: 長い「うねり」が出て、平均 0 から大きく離れた状態がしばらく続く
+
+      $\phi = 1$（ランダムウォーク）にすると、戻ってこなくなり「漂流」します。
+      これが「**株価は単位根 ($\phi \approx 1$) を持つから差分を取らないと扱いにくい**」と言われる理由です。
+    sample_code: |
+      import numpy as np
+      import matplotlib.pyplot as plt
+
+      np.random.seed(123)
+      n = 250
+      eps = np.random.normal(0, 1, n)   # 共通のショック列
+
+      def simulate_ar1(phi: float, eps: np.ndarray) -> np.ndarray:
+          y = np.zeros_like(eps)
+          for t in range(1, len(eps)):
+              y[t] = phi * y[t-1] + eps[t]
+          return y
+
+      phis = [0.0, 0.5, 0.95]
+      fig, axes = plt.subplots(3, 1, figsize=(8, 6), sharex=True)
+      for ax, phi in zip(axes, phis):
+          y = simulate_ar1(phi, eps)
+          ax.plot(y, color="steelblue", linewidth=0.9)
+          ax.axhline(0, color="gray", linewidth=0.7, alpha=0.5)
+          ax.set_title(f"AR(1)  φ = {phi}")
+          ax.set_ylim(-6, 6)
+      axes[-1].set_xlabel("time")
+      fig.tight_layout()
+      plt.show()
+      print("φ が大きいほど『一度離れた状態』が長く続く → 半減期が長い")
+    runnable: true
+    stickman: explain
+    stickman_speech: "同じショック列でも φ が違うと景色が一変。これが時系列モデルの面白さだよ！"
 
   # ─── 2. MA / ARMA モデル ────────────────────────────
   - kind: sample
@@ -223,6 +312,84 @@ pages:
     stickman: explain
     stickman_speech: "差分を取るかは「迷ったら ADF」。これを習慣化すると時系列の取り扱いが安定する。"
 
+  # ─── 3b. Box-Jenkins 方法論 ──────────────────────────
+  - kind: sample
+    title: "Box-Jenkins 方法論 — ARIMA 選定の4ステップ"
+    markdown: |
+      ## ARIMA を実データに当てるときの標準フロー
+
+      Box と Jenkins (1970) が提案し、いまも実務の標準となっている 4 ステップの流れ:
+
+      ### Step 1. Identification (識別)
+
+      モデルの次数 $(p, d, q)$ の **候補**を絞る:
+
+      1. 系列を **プロット** してトレンド・季節性・分散の変化を眺める
+      2. **対数変換** が必要か検討（分散が時間と共に大きくなる場合）
+      3. **ADF 検定** で単位根を確認 → 必要な差分階数 $d$ を決定
+      4. 差分済み系列の **ACF / PACF** を見て $p, q$ の候補を絞る
+
+      ### Step 2. Estimation (推定)
+
+      候補モデルを最尤推定でフィットし、**AIC / BIC** で比較:
+
+      | 規準 | 式 | 特徴 |
+      |---|---|---|
+      | AIC | $-2 \ln L + 2k$ | フィットと複雑度の妥協、予測重視 |
+      | BIC | $-2 \ln L + k \ln n$ | AIC より罰則きつめ、簡素なモデルを選びやすい |
+
+      ### Step 3. Diagnostic Checking (診断)
+
+      残差が **ホワイトノイズ** になっているか確認:
+
+      - **Ljung-Box 検定**: 残差に自己相関が残っていないか
+      - **正規性 (QQ プロット)**: 残差の分布の歪み・厚いテールを確認
+      - **分散一定性**: 残差の二乗の ACF を見る (残れば GARCH の出番)
+
+      もし NG なら Step 1 に戻る (次数を見直す、対数変換する等)。
+
+      ### Step 4. Forecasting (予測)
+
+      `res.forecast(steps=h)` で点予測、`res.get_forecast(steps=h).conf_int()` で予測区間。
+    sample_code: |
+      import warnings
+      warnings.filterwarnings("ignore")
+      import pandas as pd
+      from statsmodels.tsa.arima.model import ARIMA
+      from statsmodels.stats.diagnostic import acorr_ljungbox
+
+      df = pd.read_csv("data/macro_indicators.csv", parse_dates=["date"]).set_index("date")
+      cpi = df["CPI_yoy"]
+
+      # Step 1-2: (p, d, q) を Grid Search して AIC が最小の組合せを探す
+      print("【 Step 2: Grid Search 】")
+      print(f"{'(p,d,q)':10s}  {'AIC':>8s}  {'BIC':>8s}  {'LB p':>6s}")
+      best = (None, float("inf"))
+      for p in range(3):
+          for q in range(3):
+              order = (p, 1, q)
+              try:
+                  res = ARIMA(cpi, order=order).fit()
+                  lb = acorr_ljungbox(res.resid, lags=[10], return_df=True)["lb_pvalue"].iloc[0]
+                  flag = "  ←最良" if res.aic < best[1] else ""
+                  print(f"{str(order):10s}  {res.aic:8.2f}  {res.bic:8.2f}  {lb:6.3f}{flag}")
+                  if res.aic < best[1]:
+                      best = (order, res.aic)
+              except Exception as e:
+                  print(f"{str(order):10s}  failed: {e}")
+      print(f"\n→ AIC 最良モデル: ARIMA{best[0]}")
+
+      # Step 4: 最良モデルで予測
+      res = ARIMA(cpi, order=best[0]).fit()
+      fc = res.get_forecast(steps=6)
+      ci = fc.conf_int(alpha=0.05)
+      print("\n【 Step 4: 次 6 か月予測 (95% 区間) 】")
+      out = pd.concat([fc.predicted_mean.rename("point"), ci], axis=1).round(3)
+      print(out)
+    runnable: true
+    stickman: explain
+    stickman_speech: "Identification → Estimation → Diagnostic → Forecast、この 4 段が時系列実務の背骨だよ！"
+
   # ─── 4. 残差の白色化 (モデル診断) ────────────────────
   - kind: sample
     title: "残差の白色化 — Ljung-Box 検定"
@@ -271,6 +438,159 @@ pages:
     runnable: true
     stickman: explain
     stickman_speech: "AIC で素早く絞り、Ljung-Box で残差が白いかを確認、この 2 段ロケットが定石。"
+
+  # ─── 5. ARIMA 係数の読み方 ──────────────────────────
+  - kind: sample
+    title: "ARIMA 係数の読み方"
+    markdown: |
+      ## statsmodels の summary 出力をどう読むか
+
+      `ARIMA.fit().summary()` の係数表には次の項目が並びます。一度しっかり読めるようになると、
+      モデルから実務的な含意を引き出せるようになります。
+
+      ### 主な行の意味
+
+      | ラベル | 何を表すか | 典型的な値 |
+      |---|---|---|
+      | **const** (or `intercept`) | 定数項 $c$ — 系列の長期平均（差分済なら、トレンド傾き） | データに依存 |
+      | **ar.L1** | AR 1 次の係数 $\phi_1$ — 過去 1 期の自己ショックの引きずり | $-1 < \phi_1 < 1$ |
+      | **ar.L2** | AR 2 次の係数 $\phi_2$ | 同上 |
+      | **ma.L1** | MA 1 次の係数 $\theta_1$ — 過去 1 期の予測誤差の引きずり | 同上 |
+      | **sigma2** | 残差分散 $\sigma^2$ — モデルが説明しきれない分のばらつき | 系列により様々 |
+
+      ### 各列の意味
+
+      | 列 | 説明 |
+      |---|---|
+      | **coef** | 推定値 (= 点推定) |
+      | **std err** | 標準誤差 — 推定の不確実性 |
+      | **z** | 標準化係数 ($= \text{coef} / \text{std err}$) — 帰無仮説「係数 = 0」のもとでの統計量 |
+      | **P>|z|** (p 値) | 「係数が 0 ではない」と言える信頼性。**< 0.05 で有意** |
+      | **[0.025 0.975]** | 95% 信頼区間 — 区間が 0 を跨ぐ係数は実質的に 0 と区別できない |
+
+      ### 有意性の解釈
+
+      - p 値 < 0.05 → 係数 は 0 ではない（モデルに寄与している）
+      - p 値 ≥ 0.05 → 係数 は 0 とほぼ等しい → その次数は **削っても良い**
+
+      たとえば ARIMA(2, 1, 0) で ar.L2 の p 値が 0.4 なら、ar.L2 は実質効いていない →
+      ARIMA(1, 1, 0) に減らした方が **シンプルで AIC も改善する可能性大**。
+
+      ### AR(1) 係数の金融的解釈
+
+      - **$\phi_1 \approx 0$**: モデルが構造を見つけられていない → 系列は実質的にランダム
+      - **$\phi_1 \approx 0.3$**: 弱い慣性 — 株式市場の日次リターンに時々見られる
+      - **$\phi_1 \approx 0.9$**: 強い慣性 / 平均回帰 — 金利スプレッド、ボラティリティ指数
+      - **$\phi_1 \approx 1$**: 単位根 → そもそも差分が足りなかった可能性
+    sample_code: |
+      import warnings
+      warnings.filterwarnings("ignore")
+      import numpy as np
+      from statsmodels.tsa.arima.model import ARIMA
+      np.random.seed(0)
+
+      # AR(1) φ = 0.7 の系列で ARIMA(1, 0, 1) を推定
+      y = np.zeros(400)
+      for t in range(1, 400):
+          y[t] = 0.7 * y[t-1] + np.random.normal()
+
+      res = ARIMA(y, order=(1, 0, 1)).fit()
+      print(res.summary().tables[1])
+      print()
+      # コードから直接アクセスする場合
+      print(f"AR 係数 φ1 = {res.params.get('ar.L1', float('nan')):.3f}  (真値 0.7)")
+      print(f"MA 係数 θ1 = {res.params.get('ma.L1', float('nan')):.3f}  (真値 0.0 — 無意味な MA 項)")
+      print(f"残差 σ²    = {res.params['sigma2']:.3f}")
+      print()
+      # 各係数の p 値
+      print("p 値 (< 0.05 で有意):")
+      for name, pval in res.pvalues.items():
+          flag = "  ←有意" if pval < 0.05 else "  ←有意でない"
+          print(f"  {name:10s}: {pval:.4f}{flag}")
+    runnable: true
+    stickman: explain
+    stickman_speech: "p 値で各係数の必要性を判定 → 不要な次数を削る、というのが summary を読むときの基本姿勢！"
+
+  # ─── 6. 予測区間と SARIMA ──────────────────────────
+  - kind: sample
+    title: "予測区間 — 不確実性を時間で見る"
+    markdown: |
+      ## 点予測ではなく「区間」で予測する
+
+      時系列モデルは将来値を **一つの数** で返しますが、それは予測の **中央値（の推定）** にすぎません。
+      実務で重要なのは **どれくらい外れる可能性があるか**、つまり予測区間 (prediction interval) です。
+
+      ### 95% 予測区間の意味
+
+      $$ [\hat{y}_{T+h} - 1.96 \cdot \sigma_h,\ \ \hat{y}_{T+h} + 1.96 \cdot \sigma_h] $$
+
+      ここで $\sigma_h$ は **$h$ ステップ先予測の標準誤差**。
+
+      重要な性質: **予測ホライズン $h$ が増えるほど $\sigma_h$ も増える** ので、予測区間は時間と共に広がります。
+
+      ### AR(1) の予測分散の漸近
+
+      AR(1) $|\phi| < 1$ では:
+
+      $$ \mathrm{Var}(\hat{y}_{T+h}) = \sigma^2 \cdot \dfrac{1 - \phi^{2h}}{1 - \phi^2} $$
+
+      $h \to \infty$ で $\dfrac{\sigma^2}{1 - \phi^2}$ (定常分布の分散) に収束。
+      → **遠い将来の予測区間は「定常分布の範囲」に頭打ちする**。
+
+      ランダムウォーク ($\phi = 1$) では分散が線形に発散 → 区間が永遠に広がる。
+
+      ## SARIMA — 季節 ARIMA の概要
+
+      月次・四半期データには **季節性** (周期 12 や 4) が含まれることが多い。
+      これを扱うのが **SARIMA(p, d, q)(P, D, Q)$_s$**:
+
+      | 引数 | 意味 |
+      |---|---|
+      | `order=(p, d, q)` | 非季節部分（通常 ARIMA と同じ）|
+      | `seasonal_order=(P, D, Q, s)` | 季節部分: 季節 AR の次数 $P$、季節差分 $D$、季節 MA の次数 $Q$、周期 $s$ |
+
+      ### 典型例
+
+      - **月次 CPI** で「12 か月前と相関がある」: `SARIMAX(cpi, order=(1,1,1), seasonal_order=(1,1,1,12))`
+      - **四半期 GDP** で「前年同期と相関がある」: 周期 $s = 4$
+      - **日次気温** で「年間サイクルがある」: 周期 $s = 365$
+
+      ### 季節差分
+
+      $$ \Delta_{12} y_t = y_t - y_{t-12} $$
+
+      これで「前年同月との差」を取り、季節成分を除去 → 残差を SARIMA で扱う。
+    sample_code: |
+      import warnings
+      warnings.filterwarnings("ignore")
+      import pandas as pd
+      import numpy as np
+      from statsmodels.tsa.arima.model import ARIMA
+
+      df = pd.read_csv("data/macro_indicators.csv", parse_dates=["date"]).set_index("date")
+      cpi = df["CPI_yoy"]
+
+      # ARIMA(1, 1, 1) を当てて 12 か月先まで点予測 + 95% 区間
+      res = ARIMA(cpi, order=(1, 1, 1)).fit()
+      fc = res.get_forecast(steps=12)
+      mean = fc.predicted_mean
+      ci   = fc.conf_int(alpha=0.05)
+
+      out = pd.DataFrame({
+          "point":  mean.round(3).values,
+          "lower":  ci.iloc[:, 0].round(3).values,
+          "upper":  ci.iloc[:, 1].round(3).values,
+      }, index=pd.RangeIndex(1, 13, name="h"))
+      out["width"] = (out["upper"] - out["lower"]).round(3)
+      print("【 ホライズン h ごとの予測と 95% 区間 】")
+      print(out)
+      print()
+      print(f"→ width が h と共に広がるのが時系列予測の本質的性質")
+      print(f"  h=1 区間幅: {out.loc[1,'width']:.3f}")
+      print(f"  h=12 区間幅: {out.loc[12,'width']:.3f}  ({out.loc[12,'width']/out.loc[1,'width']:.1f} 倍に拡大)")
+    runnable: true
+    stickman: explain
+    stickman_speech: "予測は「点」だけでは不十分。区間を見ないと判断を誤るよ！"
 
   # ─── 演習 1: AR(1) 系列生成 ──────────────────────────
   - kind: exercise
