@@ -325,9 +325,28 @@ def create_app(ctx: ServerContext) -> FastAPI:
     )
 
     # Root → index.html ----------------------------------------------------
+    # We rewrite `/static/<file>` references in index.html to
+    # `/static/<file>?v=<mtime>` on the fly. The browser still caches
+    # them under our `Cache-Control: max-age=3600` policy, but as soon
+    # as we ship a new app.js / styles.css / modern.css the mtime
+    # bumps and the URL changes, so the next page load always sees the
+    # latest bytes -- no more "back button doesn't work because the
+    # browser is sitting on an hour-old app.js" support tickets.
+    _CACHE_BUST_FILES = ("app.js", "styles.css", "modern.css")
+
+    def _bust_for(name: str) -> str:
+        f = WEB_DIR / name
+        try:
+            return str(int(f.stat().st_mtime))
+        except OSError:
+            return "0"
+
     @app.get("/", response_class=HTMLResponse)
     async def root() -> HTMLResponse:  # noqa: D401
         html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+        for name in _CACHE_BUST_FILES:
+            v = _bust_for(name)
+            html = html.replace(f"/static/{name}", f"/static/{name}?v={v}")
         return HTMLResponse(html)
 
     # Favicon (best-effort) ------------------------------------------------
