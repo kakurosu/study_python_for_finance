@@ -186,16 +186,35 @@ class KernelSession:
                 break
 
         # Try to capture the execute_reply (non-blocking) for richer info.
-        try:
-            reply = self._client.get_shell_msg(timeout=1.0)
+        #
+        # CRITICAL: filter by parent msg_id. If a previous execute() returned
+        # without consuming its shell reply (we keep a 1s budget here, which
+        # can be missed under load), that reply stays in the shell queue.
+        # On the *next* execute() this loop would otherwise pick up the
+        # stale reply -- and if the previous run had errored, its
+        # status="error" would silently overwrite the current run's
+        # status="ok". That manifested to the user as: fix the broken code,
+        # press Run, see the old error one more time, press Run again, get
+        # the correct output. Drop any reply whose parent_header.msg_id
+        # doesn't match the request we just sent.
+        deadline = time.monotonic() + 1.0
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                reply = self._client.get_shell_msg(timeout=min(remaining, 0.5))
+            except queue.Empty:
+                break
+            if reply.get("parent_header", {}).get("msg_id") != msg_id:
+                continue  # stale reply from a prior execute(); ignore
             result.execute_reply = reply.get("content", {})
             if reply["content"].get("status") == "error" and result.status == "ok":
                 result.status = "error"
                 result.error_name = reply["content"].get("ename", "")
                 result.error_value = reply["content"].get("evalue", "")
                 result.traceback = list(reply["content"].get("traceback", []))
-        except queue.Empty:
-            pass
+            break
         return result
 
     def evaluate_expression(self, expr: str, *, timeout: float = 5.0) -> tuple[bool, str]:

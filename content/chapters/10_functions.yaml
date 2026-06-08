@@ -148,8 +148,8 @@ pages:
       ## モダン Python の関数定義 3 種の神器
 
       関数定義に型ヒントとデフォルト引数を入れると、**呼び出し側で何が必要か** が
-      シグネチャだけで分かります。FastAPI / scikit-learn など、
-      まともなライブラリはほぼ全てこのスタイル。
+      **関数の宣言行（引数リスト）** を見るだけで分かります。
+      FastAPI / scikit-learn など、まともなライブラリはほぼ全てこのスタイル。
 
       ```python
       def f(
@@ -161,14 +161,32 @@ pages:
           ...
       ```
 
-      | 要素 | 役割 | 業界での意味 |
+      | 要素 | 役割 | 役立つ場面 |
       |---|---|---|
       | 型ヒント (`x: float`) | 引数・戻り値の型を明示 | エディタ補完、mypy / pyright で型チェック |
       | デフォルト引数 (`= 0.0`) | 呼び出し側で省略可 | 「常識的な値」を提供 |
       | `*,` 以降 | キーワード引数 **のみ** 強制 | `model.fit(x, y, batch_size=32)` のように明示させて誤呼び出しを防ぐ |
 
-      **業界小ネタ**: 関数引数が **4 個を超え** たら、`*,` でキーワード強制にするのが
-      Google Style Guide の推奨。位置引数で 6 個並ぶと事故率が跳ね上がる。
+      ### `*,` (アスタリスク + カンマ) って何?
+
+      引数リストの中に **裸の `*` を 1 つだけ書く**と、それ以降の引数は
+      **「名前 = 値」の形でしか渡せなくなる**（位置引数として渡せない）ルールです:
+
+      ```python
+      def f(x, y, *, verbose=False):
+          ...
+
+      f(1, 2, True)          # ✗ TypeError ─ verbose を位置で渡そうとしている
+      f(1, 2, verbose=True)  # ○ キーワードで渡せばOK
+      ```
+
+      `*` の前の引数 (`x`, `y`) は位置でもキーワードでも OK。`*` の後 (`verbose`) は
+      **キーワード必須**。これを **keyword-only 引数** と呼びます。
+
+      なぜ便利か: `model.fit(X, y, 0.001, 50)` のような呼び出しは「最後の 2 つは
+      何の引数か」がコード上で読めません。`model.fit(X, y, learning_rate=0.001, batch_size=50)`
+      なら読めば分かります。**4 個を超える引数は `*,` でキーワード強制にする** のが
+      Google Style Guide の推奨スタイル。位置引数で 6 個並ぶとバグ率が跳ね上がります。
     sample_code: |
       def compound_return(
           monthly_returns: list[float],
@@ -207,11 +225,15 @@ pages:
       print(f"算術平均 (年率): {compound_return(data, method='arithmetic') * 100:5.2f}%")
       print(f"通期 (非年率)  : {compound_return(data, annualise=False) * 100:5.2f}%")
 
-      # 位置引数で method を渡そうとするとエラー → 安全
+      # --- keyword-only の効果を確認 ---
+      # compound_return は def で `*,` を入れたので method / annualise は
+      # **必ず `method=...` のように名前付き** で渡す必要があります。
+      # 位置引数で渡そうとすると Python が拒否してくれる ──
+      # これが「引数の取り違えバグを防ぐ」`*,` の実利です。
       try:
-          compound_return(data, "arithmetic")
+          compound_return(data, "arithmetic")    # ← "arithmetic" を位置で渡そうとした
       except TypeError as e:
-          print(f"\n位置引数渡しは禁止: {e}")
+          print(f"\n位置引数渡しは拒否されます: {e}")
     runnable: true
     stickman: explain
     stickman_speech: "型ヒント + キーワード引数で書いておくと、半年後の自分が「これ何だっけ?」と迷わない。"
