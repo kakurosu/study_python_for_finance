@@ -33,15 +33,15 @@ pages:
       `"""` で囲んだ複数行文字列をよく使います。
       `help(関数名)` で表示でき、IDE のヒントにも使われます。
     sample_code: |
-      def sharpe_ratio(mean_return, volatility, rf=0.0):
+      def sharpe_ratio(mean_return, standard_deviation, rf=0.0):
           """シャープレシオを計算する。
 
           Args:
-              mean_return: 期待リターン
-              volatility:  ボラティリティ（標準偏差）
-              rf:          リスクフリーレート
+              mean_return:        期待リターン
+              standard_deviation: リターンの標準偏差
+              rf:                 リスクフリーレート
           """
-          return (mean_return - rf) / volatility
+          return (mean_return - rf) / standard_deviation
 
       help(sharpe_ratio)
     runnable: true
@@ -135,7 +135,7 @@ pages:
 
       Python のコメントは `#`、関数の説明は **docstring** (`"""..."""`) を使います。
       docstring の書き方には 3 流派があり、Google スタイルが最も読みやすいとされ
-      Google・py4fi2nd・FastAPI などが採用。
+      Google・FastAPI などが採用。
 
       | スタイル | 例 |
       |---|---|

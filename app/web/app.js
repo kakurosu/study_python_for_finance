@@ -1019,6 +1019,23 @@ function updateFooterAndMascot(page) {
   const total = state.currentDetail.pages.length;
   const i = state.currentPageIndex;
 
+  // Prev button: visible on every page except the very first; on the
+  // result overlay it reads "答案に戻る" so the user can edit before retrying.
+  const prevBtn = $('#prev-btn');
+  if (prevBtn) {
+    if (state.showingResult) {
+      prevBtn.textContent = '← 答案に戻る';
+      prevBtn.disabled = false;
+      prevBtn.style.visibility = 'visible';
+    } else if (i > 0) {
+      prevBtn.textContent = '← 前のページ';
+      prevBtn.disabled = false;
+      prevBtn.style.visibility = 'visible';
+    } else {
+      prevBtn.style.visibility = 'hidden';
+    }
+  }
+
   if (state.showingResult) {
     $('#next-btn').textContent =
       (i === total - 1 && state.lastResult?.passed) ? '章を完了する'
@@ -1590,6 +1607,26 @@ function bindUi() {
       }
     } else {
       submitCurrentPage();
+    }
+  });
+
+  // Back-button on the chapter page (goes to the previous page in the
+  // same chapter; disabled on the first page and on the result screen).
+  $('#prev-btn')?.addEventListener('click', () => {
+    if (state.showingResult) {
+      // From the result overlay, back returns to the same page in edit mode.
+      state.showingResult = false;
+      state.lastResult    = null;
+      paintChapterPage();
+      return;
+    }
+    if (state.currentPageIndex > 0) {
+      state.currentPageIndex--;
+      // Clear any in-flight answers/result for the new (previous) page.
+      state.lastResult = null;
+      state.showingResult = false;
+      bumpLastActivity(state.currentChapter.id, state.currentPageIndex);
+      paintChapterPage();
     }
   });
 

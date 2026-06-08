@@ -1167,6 +1167,7 @@ hr { border: none; height: 1px; background: var(--line-2); }
   border-top: 1px solid var(--line-1);
   background: var(--chrome);
 }
+.chapter__foot-left  { display: flex; align-items: center; gap: 8px; }
 .chapter__foot-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
 /* ============================================================

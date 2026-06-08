@@ -126,9 +126,6 @@ pages:
       - **Green**: 通常範囲内
       - **Yellow**: 警告 (リスク部門に共有)
       - **Red**: 取引停止 / マネジメント報告
-
-      閾値は静的ではなく、**ポートフォリオ規模に応じた割合** で決めるのが業界の作法。
-      (例: NAV の 2% を超えたら Yellow、5% を超えたら Red)
     sample_code: |
       def classify(daily_loss: float, nav: float) -> str:
           loss_pct = daily_loss / nav

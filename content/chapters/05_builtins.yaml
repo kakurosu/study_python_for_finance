@@ -130,7 +130,7 @@ pages:
       print(f"合計リターン (単純加算): {sum(returns) * 100:+.2f}%")
       print(f"最大月次 : {max(returns) * 100:+.2f}%")
       print(f"最小月次 : {min(returns) * 100:+.2f}%")
-      print(f"絶対値合計: {sum(abs(r) for r in returns) * 100:.2f}%  (総取引活動度)")
+      print(f"絶対値合計: {sum(abs(r) for r in returns) * 100:.2f}%")
       print(f"平均     : {sum(returns) / len(returns) * 100:+.3f}%")
 
       # ティッカー + 重みのペア処理

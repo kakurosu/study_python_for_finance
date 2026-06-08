@@ -130,7 +130,7 @@ pages:
       `plt.plot(...)` は **暗黙の現在の Axes** に描画する MATLAB 流のスタイル。
       手軽だが、**Sub-plot や複数 Figure を扱うときに「どこに描いているか」が曖昧** に。
 
-      業界標準（py4fi2nd / matplotlib 公式）は **明示的に Figure と Axes を取り出す**:
+      業界標準（matplotlib 公式推奨）は **明示的に Figure と Axes を取り出す**:
 
       ```python
       fig, ax = plt.subplots()   # 1 Figure・1 Axes
