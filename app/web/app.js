@@ -1019,16 +1019,13 @@ function updateFooterAndMascot(page) {
   const total = state.currentDetail.pages.length;
   const i = state.currentPageIndex;
 
-  // Prev button: visible on every page except the very first; on the
-  // result overlay it reads "答案に戻る" so the user can edit before retrying.
+  // Back button: visible on every page except the very first.
+  // From the result overlay it returns to the answer-edit view; from
+  // the edit view it goes to the previous page in the chapter.
   const prevBtn = $('#prev-btn');
   if (prevBtn) {
-    if (state.showingResult) {
-      prevBtn.textContent = '← 答案に戻る';
-      prevBtn.disabled = false;
-      prevBtn.style.visibility = 'visible';
-    } else if (i > 0) {
-      prevBtn.textContent = '← 前のページ';
+    if (state.showingResult || i > 0) {
+      prevBtn.textContent = '戻る';
       prevBtn.disabled = false;
       prevBtn.style.visibility = 'visible';
     } else {
