@@ -964,6 +964,37 @@ hr { border: none; height: 1px; background: var(--line-2); }
   overflow-x: auto;
 }
 
+/* GFM markdown tables rendered by renderMarkdown / renderMarkdownTable. */
+.lesson__md .md-table {
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  width: auto;
+  max-width: 100%;
+  border: 1px solid var(--line-2);
+}
+.lesson__md .md-table th,
+.lesson__md .md-table td {
+  border: 1px solid var(--line-2);
+  padding: 6px 12px;
+  vertical-align: top;
+  text-align: left;
+  color: var(--ink-2);
+}
+.lesson__md .md-table th {
+  background: var(--surface-2, rgba(255, 255, 255, 0.04));
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: -0.1px;
+}
+.lesson__md .md-table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.02);
+}
+.lesson__md .md-table code {
+  font-size: 12px;
+}
+
 /* Reading page choices */
 .choices { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
 .choice {

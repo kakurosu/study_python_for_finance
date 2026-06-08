@@ -307,8 +307,49 @@ function applyMath(root) {
   });
 }
 
-// Render simple markdown subset: paragraphs, headings, bold, inline code,
-// fenced code. Sufficient for our chapter content.
+// Parse a single GitHub-Flavored Markdown table block (already
+// escapeHtml'd, inline marks like <strong>/<code> may already be
+// substituted) and return its <table> HTML, or null if it doesn't
+// look like a table.
+function renderMarkdownTable(block) {
+  const lines = block.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length < 2) return null;
+  for (const l of lines) {
+    if (!l.startsWith('|') || !l.endsWith('|')) return null;
+  }
+  // 2nd line must be the alignment separator: |---|:-:|---|
+  const sepRe = /^\|(\s*:?-+:?\s*\|)+$/;
+  if (!sepRe.test(lines[1])) return null;
+  const parseRow = (line) => line.slice(1, -1).split('|').map(c => c.trim());
+  const aligns = parseRow(lines[1]).map(cell => {
+    const left  = cell.startsWith(':');
+    const right = cell.endsWith(':');
+    if (left && right) return 'center';
+    if (right) return 'right';
+    if (left)  return 'left';
+    return null;
+  });
+  const headers = parseRow(lines[0]);
+  const rows = lines.slice(2).map(parseRow);
+  const styleFor = (i) => aligns[i] ? ` style="text-align:${aligns[i]}"` : '';
+  let out = '<table class="md-table"><thead><tr>';
+  for (let i = 0; i < headers.length; i++) {
+    out += `<th${styleFor(i)}>${headers[i]}</th>`;
+  }
+  out += '</tr></thead><tbody>';
+  for (const row of rows) {
+    out += '<tr>';
+    for (let i = 0; i < row.length; i++) {
+      out += `<td${styleFor(i)}>${row[i] || ''}</td>`;
+    }
+    out += '</tr>';
+  }
+  out += '</tbody></table>';
+  return out;
+}
+
+// Render simple markdown subset: paragraphs, headings, bold, inline
+// code, fenced code, and GFM tables. Sufficient for our chapter content.
 function renderMarkdown(md) {
   if (!md) return '';
   // Fenced code first (avoid mangling)
@@ -328,9 +369,14 @@ function renderMarkdown(md) {
   html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
   // Inline code `x`
   html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
-  // Paragraphs (double newline)
+  // Paragraphs (double newline) + GFM tables
   html = html.split(/\n{2,}/).map(p => {
-    if (/^<(h\d|ul|ol|pre)/i.test(p.trim())) return p;
+    const trimmed = p.trim();
+    if (/^<(h\d|ul|ol|pre)/i.test(trimmed)) return p;
+    if (trimmed.startsWith('|')) {
+      const tbl = renderMarkdownTable(p);
+      if (tbl) return tbl;
+    }
     return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
   }).join('\n');
   // Restore fenced blocks with highlighting
