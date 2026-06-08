@@ -127,7 +127,7 @@ pages:
       - "標準偏差は std。"
       - "不偏推定は ddof=1。"
     stickman_feedback:
-      correct: "不偏推定は CMA でも頻出！"
+      correct: "不偏推定は金融実務でも頻出！"
       wrong_hint1: "`std` と `ddof=1`。"
       wrong_hint2: "`std` と `ddof=1`。"
       wrong_hint3: "`std` と `ddof=1`。"

@@ -342,7 +342,7 @@ function renderMarkdown(md) {
 
 // ---------- Renderers (dashboard / chapters / tests / history) ----------
 const PHASE_LABEL = {
-  A: 'Python 文法基礎', B: '数値ライブラリ', C: '金融計算 (CMA)',
+  A: 'Python 文法基礎', B: '数値ライブラリ', C: '金融計算',
   D: 'ML / DL',         E: '外部連携',       F: 'アプリ開発',
 };
 

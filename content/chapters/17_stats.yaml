@@ -19,7 +19,7 @@ pages:
       | $\mathrm{Var}[r]$ | リターンのばらつき | `r.var(ddof=1)` |
       | $\sigma$ | ばらつきの平方根（標準偏差） | `r.std(ddof=1)` |
 
-      **年率換算**: 期待値は $\times 252$、ボラ ($\sigma$) は $\times \sqrt{252}$。
+      **年率換算**: 期待値は $\times 252$、標準偏差 ($\sigma$) は $\times \sqrt{252}$。年率換算後の $\sigma$ を一般に **ボラティリティ（volatility）** と呼びます。
 
       $$ \mu_{\text{annual}} = \mu_{\text{daily}} \times 252,\quad \sigma_{\text{annual}} = \sigma_{\text{daily}} \times \sqrt{252} $$
 
@@ -27,11 +27,11 @@ pages:
     sample_code: |
       import numpy as np
       r = np.array([0.001, -0.002, 0.003, -0.001, 0.002, 0.0, 0.001])
-      print("年率リターン:", round(r.mean() * 252, 4))
-      print("年率ボラ:    ", round(r.std(ddof=1) * np.sqrt(252), 4))
+      print("年率リターン      :", round(r.mean() * 252, 4))
+      print("年率ボラティリティ:", round(r.std(ddof=1) * np.sqrt(252), 4))
     runnable: true
     stickman: explain
-    stickman_speech: "ボラの年率化は √252 倍が正しいよ！"
+    stickman_speech: "標準偏差の年率化は √252 倍。年率値をボラティリティと呼ぶよ！"
 
   - kind: exercise
     title: "期待値を年率に換算しよう"
@@ -42,7 +42,7 @@ pages:
 
       $$ \mu_{\text{ann}} = \mu_{\text{daily}} \times 252,\quad \mathrm{Var}_{\text{ann}} = \mathrm{Var}_{\text{daily}} \times 252,\quad \sigma_{\text{ann}} = \sigma_{\text{daily}} \times \sqrt{252} $$
 
-      これは「**独立同分布（i.i.d.）の和の分散は分散の和になる**」という確率論の基本性質から来ています。CMA 試験の記述問題でも問われる重要事項。
+      これは「**独立同分布（i.i.d.）の和の分散は分散の和になる**」という確率論の基本性質から来ています。金融実務での年率換算の前提です。
     code_template: |
       import numpy as np
       r = np.array([0.001, -0.002, 0.003, -0.001, 0.002, 0.0, 0.001])
@@ -63,7 +63,7 @@ pages:
       - "日次平均 × 252 営業日 = 年率期待リターン。"
       - "`r.mean() * 252` だね。"
     stickman_feedback:
-      correct: "期待値の年率換算、CMA でも頻出！"
+      correct: "期待値の年率換算、金融実務で頻出！"
       wrong_hint1: "平均 × 252。"
       wrong_hint2: "`r.mean() * 252`"
       wrong_hint3: "`r.mean() * 252`"
@@ -71,13 +71,13 @@ pages:
   - kind: exercise
     title: "標準偏差を年率に換算しよう"
     prompt: |
-      **ボラティリティ（σ）= リスクの尺度**。リターンのばらつきの大きさを示します。年率 σ が 20% なら「±20% くらい振れることが多い」というイメージ。
+      **標準偏差（σ）= リスクの基本指標**。リターンのばらつきの大きさを示します。年率換算した σ を **ボラティリティ** と呼び、年率 σ が 20% なら「±20% くらい振れることが多い」というイメージ。
 
       **不偏分散（ddof=1）vs 母分散（ddof=0）**:
       - `r.std()` — デフォルトは ddof=0（母分散）
       - `r.std(ddof=1)` — n-1 で割る不偏推定（**標本データではこちら**）
 
-      標本（実測データ）から母集団のばらつきを推定するときは ddof=1 が標準。CMA でも実務でも基本的に **ddof=1** を使います。
+      標本（実測データ）から母集団のばらつきを推定するときは ddof=1 が標準。金融実務では基本的に **ddof=1** を使います。
     code_template: |
       import numpy as np
       r = np.array([0.001, -0.002, 0.003, -0.001, 0.002, 0.0, 0.001])
@@ -96,7 +96,7 @@ pages:
       - kind: stdout_regex
         pattern: '^0\.0273\s*$'
     hints:
-      - "ボラの年率化は √252 倍。"
+      - "標準偏差の年率化は √252 倍。"
       - "不偏推定は ddof=1。"
       - "`ddof=1` と `sqrt`。"
     stickman_feedback:
@@ -108,8 +108,8 @@ pages:
   - kind: exercise
     title: "リターン要約関数を作ろう"
     prompt: |
-      期待リターンと年率ボラを返す関数 `summarize` を完成させてください。
-      引数は日次リターン配列、戻り値はタプル `(年率リターン, 年率ボラ)`。
+      期待リターンと年率ボラティリティを返す関数 `summarize` を完成させてください。
+      引数は日次リターン配列、戻り値はタプル `(年率リターン, 年率ボラティリティ)`。
     code_template: |
       import numpy as np
       def summarize({{slot:arg}}):
@@ -145,7 +145,7 @@ pages:
 
   # ─── 参考実装: fund_returns で 4 ファンド年率 μ / σ テーブル ──
   - kind: sample
-    title: "参考実装 — 4 ファンドの年率リターン / ボラ サマリ"
+    title: "参考実装 — 4 ファンドの年率リターン / ボラティリティ サマリ"
     markdown: |
       ## 月次リターンから年率指標を出す定型
 
@@ -154,7 +154,7 @@ pages:
       | 指標 | 計算 | 意味 |
       |---|---|---|
       | 年率リターン $\mu$ | 月次平均 × 12 | 期待リターン |
-      | 年率ボラ $\sigma$ | 月次 std × $\sqrt{12}$ | リスク |
+      | 年率ボラティリティ $\sigma$ | 月次標準偏差 × $\sqrt{12}$ | リスク |
       | 観測数 N | 月数 | サンプルサイズ |
       | 最大 / 最小月次 | min / max | テールリスクの簡易確認 |
 
@@ -162,7 +162,7 @@ pages:
       $\sigma_{\text{annual}}^2 = 12 \cdot \sigma_{\text{monthly}}^2$。両辺を平方根すると
       $\sigma_{\text{annual}} = \sigma_{\text{monthly}} \sqrt{12}$。
 
-      ボラの年率化に √ が要るのは、リターンの加算ではなく **分散の加算** に由来。
+      標準偏差の年率化に $\sqrt{T}$ が要るのは、リターンの加算ではなく **分散の加算** に由来。
       これを「平均は時間で増える / リスクは時間の平方根で増える」と覚える。
     sample_code: |
       import pandas as pd
@@ -184,4 +184,4 @@ pages:
       print(out)
     runnable: true
     stickman: explain
-    stickman_speech: "μ と σ、それぞれ年率に揃えて並べるとファンド比較がはじめて意味を持つ。"
+    stickman_speech: "期待リターン (μ) と標準偏差 (σ)、それぞれ年率に揃えて並べるとファンド比較がはじめて意味を持つ。"

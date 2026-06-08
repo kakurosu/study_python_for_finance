@@ -37,18 +37,18 @@ pages:
   - kind: sample
     title: "トラッキングエラーとは"
     markdown: |
-      ## Tracking Error = アクティブリターンのボラティリティ
+      ## Tracking Error = アクティブリターンの標準偏差（年率）
 
       ファンドリターン $r_p$ とベンチマーク $r_b$ の差を **アクティブリターン** と呼びます:
 
       $$ \alpha_t = r_p(t) - r_b(t) $$
 
-      その標準偏差 (年率換算) が **トラッキングエラー (TE)**:
+      その **標準偏差** を年率換算したものが **トラッキングエラー (TE)**（年率ボラティリティ）:
 
       $$ \text{TE} = \sigma(r_p - r_b) \times \sqrt{252} $$
 
       アクティブ運用の「ベンチマークからの逸脱の大きさ」を測る指標で、
-      情報比率 (IR) の **分母** にもなります (次章)。
+      インフォメーション・レシオ (IR) の **分母** にもなります (次章)。
     sample_code: |
       import numpy as np
       rp = np.array([0.012, -0.018, 0.005, 0.015, -0.007])
@@ -224,7 +224,7 @@ pages:
       w = np.ones(n) / n
       port_var = float(w @ cov_ann.values @ w)
       port_vol = port_var ** 0.5
-      print(f"Equal-weight portfolio ann. vol = {port_vol:.4f}")
+      print(f"Equal-weight portfolio annual vol (年率ボラティリティ) = {port_vol:.4f}")
 
       # リスク分解
       mcr = (cov_ann.values @ w) / port_vol   # marginal contribution

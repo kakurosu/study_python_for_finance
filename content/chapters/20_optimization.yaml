@@ -33,8 +33,8 @@ pages:
       w = np.array([0.5, 0.5])
       port_var = w @ cov @ w
       port_vol = np.sqrt(port_var)
-      print("分散:", round(port_var, 6))
-      print("ボラ:", round(port_vol, 4))
+      print("分散     :", round(port_var, 6))
+      print("標準偏差 :", round(port_vol, 4))
     runnable: true
     stickman: explain
     stickman_speech: "@ は行列積。numpy で `wᵀΣw` を 1 行で書けるよ！"
@@ -57,8 +57,8 @@ pages:
       cons = [{'type': 'eq', 'fun': lambda w: w.sum() - 1}]
       bnds = [(0, 1), (0, 1)]
       res = minimize(port_var, [0.5, 0.5], bounds=bnds, constraints=cons)
-      print("最適重み:", res.x.round(4))
-      print("最小ボラ:", round(np.sqrt(res.fun), 4))
+      print("最適重み     :", res.x.round(4))
+      print("最小標準偏差 :", round(np.sqrt(res.fun), 4))
     runnable: true
     stickman: explain
     stickman_speech: "Markowitz 理論 by scipy！"
@@ -240,7 +240,7 @@ pages:
 
       - 期待リターンは **使わない**
       - 代わりに **全資産のリスク寄与 (component contribution) を均等** にする
-      - 結果として、低ボラ資産 (債券など) が **大きなウェイト** を持つ
+      - 結果として、低ボラティリティ資産 (債券など) が **大きなウェイト** を持つ
 
       最適化問題:
 

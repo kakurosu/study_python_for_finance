@@ -17,7 +17,7 @@ pages:
 
       $$ S_T = S_0 \exp\!\Bigl( \bigl(\mu - \tfrac{\sigma^2}{2}\bigr) T + \sigma \sqrt{T}\, Z \Bigr),\quad Z \sim \mathcal{N}(0, 1) $$
 
-      - $\mu$: 期待リターン (年率)、$\sigma$: ボラティリティ (年率)
+      - $\mu$: 期待リターン (年率)、$\sigma$: ボラティリティ (= リターンの年率標準偏差)
       - **ドリフト補正項 $-\sigma^2/2$** は伊藤の補題から来る (これを忘れると価格期待値がズレる)
       - たくさんの $Z$ をサンプリング → $S_T$ の分布 → ペイオフを平均 → 割引でオプション価格
     sample_code: |

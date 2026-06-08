@@ -1,46 +1,59 @@
 id: 19
-title: "シャープレシオ・情報比率"
+title: "シャープレシオ・インフォメーションレシオ"
 phase: C
 prerequisites: [18]
 learning_goals:
-  - "シャープレシオ SR = (μ - rf) / σ を計算できる"
-  - "情報比率 IR = α / TE を計算できる"
+  - "シャープレシオ SR = (μ - rf) / σ を計算できる（σ はリターンの標準偏差）"
+  - "インフォメーションレシオ IR = α / TE を計算できる"
   - "両指標が「リスク 1 単位あたりのリターン」であることを理解する"
 
 pages:
   - kind: sample
-    title: "シャープレシオ — リスク調整リターン"
+    title: "シャープレシオ — リスク調整後リターン"
     markdown: |
       ## Sharpe Ratio = リスク 1 単位あたりの超過リターン
 
       $$ \text{SR} = \dfrac{\mathbb{E}[r_p] - r_f}{\sigma_p} = \dfrac{\mu_p - r_f}{\sigma_p} $$
 
+      | 記号 | 意味 |
+      |---|---|
+      | $\mu_p$ | ポートフォリオの期待リターン（平均リターン）|
+      | $r_f$ | 無リスク利子率（risk-free rate） |
+      | $\sigma_p$ | **ポートフォリオリターンの標準偏差**（年率化したものを「ボラティリティ」と呼ぶ）|
+
+      分子・分母は **同一の時間スケールに揃える** のが鉄則です。年率の $\mu_p$ と年率の $\sigma_p$（= 年率ボラティリティ）を使うのが一般的。
+
       「**取ったリスク 1 単位 ($\sigma_p$) あたりに、無リスク資産 $r_f$ より どれだけ稼いだか**」を測る指標。
-      William Sharpe (1990 ノーベル経済学賞) が提案。
+      William Sharpe (1990 年ノーベル経済学賞) が提案。
       高いほど効率の良い運用。一般的に SR > 1 は優秀、> 2 は卓越。
     sample_code: |
-      def sharpe_ratio(mu, vol, rf=0.0):
-          return (mu - rf) / vol
+      def sharpe_ratio(mu, sigma, rf=0.0):
+          """
+          mu    : 期待リターン（年率）
+          sigma : リターンの標準偏差（年率、= ボラティリティ）
+          rf    : 無リスク利子率（年率）
+          """
+          return (mu - rf) / sigma
 
       print("Fund A:", round(sharpe_ratio(0.10, 0.18, 0.02), 4))
       print("Fund B:", round(sharpe_ratio(0.06, 0.08, 0.02), 4))
     runnable: true
     expected_output: "Fund A: 0.4444\nFund B: 0.5"
     stickman: explain
-    stickman_speech: "リターンが高くてもリスクが大きいと SR は下がる！"
+    stickman_speech: "分母は『リターンの標準偏差』。年率化したものを『ボラティリティ』と呼ぶよ！"
 
   - kind: sample
-    title: "情報比率 (IR)"
+    title: "インフォメーションレシオ (IR)"
     markdown: |
-      ## Information Ratio = アクティブリターン ÷ トラッキングエラー
+      ## Information Ratio = アクティブリターンの期待値 ÷ トラッキングエラー
 
       $$ \text{IR} = \dfrac{\mu_p - \mu_b}{\sigma(r_p - r_b)} = \dfrac{\alpha}{\text{TE}} $$
 
-      ベンチマーク **対比** の評価指標です。$\alpha$ はベンチを超過した平均リターン、$\text{TE}$ はその差分系列の標準偏差。
-      - **α (アルファ)**: ベンチマーク超過の期待リターン (= 平均アクティブリターン)
-      - **TE**: アクティブリターンのボラ（前章）
+      ベンチマーク **対比** の評価指標です。
+      - **$\alpha$（アルファ）**: ベンチマーク超過の期待リターン（= 平均アクティブリターン $\overline{r_p - r_b}$）
+      - **$\text{TE}$（トラッキングエラー）**: アクティブリターンの **標準偏差**（年率換算した値）
 
-      アクティブ運用の腕前を測る代表指標。
+      アクティブ運用の腕前を測る代表指標。シャープレシオが「絶対水準」（無リスク資産との比較）を測るのに対し、IR は「相対水準」（ベンチマークとの比較）を測ります。
     sample_code: |
       alpha = 0.03   # ベンチ対比 +3%
       te = 0.04
@@ -49,23 +62,25 @@ pages:
     runnable: true
     expected_output: "0.75"
     stickman: explain
-    stickman_speech: "IR > 0.5 はそこそこ、> 1 は優秀なアクティブマネージャー！"
+    stickman_speech: "IR > 0.5 で良好、> 1 は優秀なアクティブマネージャー！"
 
   - kind: exercise
     title: "シャープレシオ関数を作ろう"
     prompt: |
-      **シャープレシオ（Sharpe Ratio, SR）** は William Sharpe が提唱（ノーベル経済学賞）したリスク調整リターン指標:
+      **シャープレシオ（Sharpe Ratio, SR）** は William Sharpe が提唱（ノーベル経済学賞）したリスク調整後リターン指標:
 
       $$ SR = \frac{\mu - r_f}{\sigma} $$
 
-      意味:「**1 単位のリスク** で何 % の超過リターンが得られるか」。
+      ここで $\sigma$ は **リターンの標準偏差**（年率換算した値を「ボラティリティ」と呼ぶ）。
+
+      意味:「**1 単位のリスク（標準偏差）** で何 % の超過リターンが得られるか」。
       - **SR > 1** : 優秀
       - **SR > 2** : 卓越（プロでもなかなか到達しない）
       - **SR < 0** : 無リスク資産以下（運用する価値なし）
 
-      `rf=0.0` をデフォルトにすると、`sharpe(mu, vol)` のように `rf` を省略して呼べます。同じ関数を複数の場面で再利用しやすくなります。
+      `rf=0.0` をデフォルトにすると、`sharpe(mu, sigma)` のように `rf` を省略して呼べます。同じ関数を複数の場面で再利用しやすくなります。
     code_template: |
-      def sharpe(mu, vol, {{slot:rf_arg}}):
+      def sharpe(mu, sigma, {{slot:rf_arg}}):
           return {{slot:formula}}
 
       print(round(sharpe(0.10, 0.18, 0.02), 4))
@@ -78,21 +93,21 @@ pages:
           - '^rf\s*=\s*0$'
         hint: "デフォルト 0 のキーワード引数"
       - id: formula
-        canonical_answer: "(mu - rf) / vol"
+        canonical_answer: "(mu - rf) / sigma"
         accept_patterns:
-          - '^\(?\s*mu\s*-\s*rf\s*\)?\s*/\s*vol$'
-        hint: "(mu - rf) / vol"
+          - '^\(?\s*mu\s*-\s*rf\s*\)?\s*/\s*sigma$'
+        hint: "(mu - rf) / sigma"
     test_cases:
       - kind: stdout_regex
         pattern: '^0\.4444\s*\n0\.5556\s*$'
     hints:
       - "`rf=0` をデフォルトにする。"
-      - "式は `(mu - rf) / vol`。"
+      - "式は `(mu - rf) / sigma`。"
     stickman_feedback:
       correct: "デフォルト引数で柔軟な関数になったね！"
-      wrong_hint1: "`rf=0.0` と `(mu - rf) / vol`。"
-      wrong_hint2: "`rf=0.0` と `(mu - rf) / vol`。"
-      wrong_hint3: "`rf=0.0` と `(mu - rf) / vol`。"
+      wrong_hint1: "`rf=0.0` と `(mu - rf) / sigma`。"
+      wrong_hint2: "`rf=0.0` と `(mu - rf) / sigma`。"
+      wrong_hint3: "`rf=0.0` と `(mu - rf) / sigma`。"
 
   - kind: exercise
     title: "情報比率を計算しよう"
@@ -134,14 +149,14 @@ pages:
       ## 「リスク調整後リターン」で並べ直す
 
       生のリターンで並べると「リスクを取った分の上振れ」を見落とす。
-      実務では **Sharpe Ratio (絶対)** と **Information Ratio (対ベンチマーク)** で並べる。
+      実務では **シャープレシオ（絶対的なリスク調整）** と **インフォメーションレシオ（ベンチマーク対比）** で並べる。
 
       $$ \text{SR} = \dfrac{\mu_p - r_f}{\sigma_p},\quad \text{IR} = \dfrac{\mu_p - \mu_b}{\sigma(r_p - r_b)} $$
 
-      | 指標 | 何を測るか | 業界の合格ライン |
+      | 指標 | 分母（リスク尺度） | 業界の合格ライン |
       |---|---|---|
-      | SR | リスクフリーを上回るリターン / 全リスク | > 1.0 良好、> 2.0 優秀 |
-      | IR | ベンチマーク超過 / トラッキングエラー | > 0.5 良好、> 1.0 優秀 |
+      | SR | ポートフォリオ全体のリターンの標準偏差 $\sigma_p$ | > 1.0 良好、> 2.0 優秀 |
+      | IR | アクティブリターンの標準偏差 = トラッキングエラー | > 0.5 良好、> 1.0 優秀 |
 
       **注意**: SR は無リスク資産を想定するので **株式 100% 戦略には IR が適切**。
       混同するとパッシブとアクティブを区別できない。

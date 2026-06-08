@@ -1,58 +1,278 @@
 id: 23
-title: "時系列モデル"
+title: "時系列分析"
 phase: D
 prerequisites: [15, 17]
 learning_goals:
-  - "時系列データの自己相関を観察できる"
-  - "statsmodels で AR / ARMA モデルを推定できる"
-  - "残差の白色化を理解する"
+  - "定常性・自己相関・ホワイトノイズ・ランダムウォークの違いを説明できる"
+  - "ACF / PACF を使って ARMA(p, q) の次数候補を絞り込める"
+  - "ADF 検定で単位根を判定し、差分階数 d を決められる"
+  - "statsmodels で AR / MA / ARMA / ARIMA モデルを推定し、残差の白色化を確認できる"
 
 pages:
+  # ─── 0. 時系列の基礎用語 ─────────────────────────────
   - kind: sample
-    title: "AR(1) モデル"
+    title: "時系列分析の基本用語"
     markdown: |
-      ## 自己回帰モデル
+      ## 時系列とは
 
-      $$ y_t = \phi\, y_{t-1} + \varepsilon_t,\quad \varepsilon_t \sim \mathcal{N}(0,\sigma^2) $$
+      **時系列 (time series)** とは、時間順に並んだ観測値の系列 $\{y_t\}_{t=1,2,\dots,T}$ のこと。
+      株価・金利・GDP・気温・売上高など、金融・経済データの大半はこの形をしています。
 
-      - $\phi$ (ファイ) は **過去の値をどれだけ引きずるか** を決める係数 ($|\phi| < 1$ で定常)
-      - $\phi$ が **1 に近いほど** 過去の値を強く引きずる (ランダムウォークに近づく)
-      - $\phi$ が **0 に近いほど** 過去とは独立 (ホワイトノイズに近づく)
+      ### 1. 定常性 (stationarity)
+
+      **(弱)定常性** とは、次の 3 条件を満たすこと:
+
+      - **平均が一定**: $\mathbb{E}[y_t] = \mu$ (時間 $t$ によらない)
+      - **分散が一定**: $\mathrm{Var}(y_t) = \sigma^2$
+      - **共分散が時差だけに依存**: $\mathrm{Cov}(y_t, y_{t-k}) = \gamma(k)$ ($t$ には依存せず、$k$ だけに依存)
+
+      **多くの統計モデル（ARMA など）は定常性を前提**にしているため、まず定常か非定常かを判断するのが時系列分析の出発点です。
+
+      ### 2. ホワイトノイズ (white noise)
+
+      $$ \varepsilon_t \overset{\text{i.i.d.}}{\sim} \mathcal{N}(0, \sigma^2) $$
+
+      平均 0・分散 $\sigma^2$ で、過去とまったく相関がない系列。**「説明できる構造が何もない」状態のベンチマーク**。
+      モデルが当てはまったかを確認するときは「**残差がホワイトノイズになっているか**」を見ます (＝ **残差の白色化**)。
+
+      ### 3. ランダムウォーク (random walk)
+
+      $$ y_t = y_{t-1} + \varepsilon_t $$
+
+      毎時点 ε_t ずつ累積していく系列。**非定常** (分散が時間 $t$ に比例して大きくなる)。
+      株価などはランダムウォークに近い動きを示し、差分 ($\Delta y_t = y_t - y_{t-1}$) を取ると定常 (= リターン) になる、というのが金融時系列の基本構造です。
+
+      ### 4. 自己相関 (autocorrelation)
+
+      時系列 $y_t$ と $y_{t-k}$ のあいだの相関係数を **自己相関**、$k$ を **ラグ (lag)** と呼びます:
+
+      $$ \rho(k) = \dfrac{\mathrm{Cov}(y_t, y_{t-k})}{\mathrm{Var}(y_t)} $$
+
+      ラグごとに並べた関数 $\rho(0), \rho(1), \rho(2), \dots$ を **自己相関関数 ACF** といいます。
+    sample_code: |
+      import numpy as np
+      np.random.seed(0)
+
+      # 1) ホワイトノイズ
+      wn = np.random.normal(0, 1, 200)
+
+      # 2) ランダムウォーク (ホワイトノイズの累積和)
+      rw = wn.cumsum()
+
+      # 3) AR(1) 過程: y_t = 0.7 * y_{t-1} + ε_t (定常)
+      ar1 = np.zeros(200)
+      for t in range(1, 200):
+          ar1[t] = 0.7 * ar1[t-1] + np.random.normal()
+
+      for name, x in [("White Noise", wn), ("Random Walk", rw), ("AR(1) φ=0.7", ar1)]:
+          print(f"{name:14s}  mean={x.mean():+.3f}  std={x.std():.3f}")
+      # ホワイトノイズと AR(1) は標準偏差が安定 (定常)
+      # ランダムウォークだけ標準偏差が大きく出る (非定常)
+    runnable: true
+    stickman: explain
+    stickman_speech: "ホワイトノイズ・ランダムウォーク・AR(1) — まずこの 3 つの違いを身体で覚えよう。"
+
+  # ─── 1. AR(1) モデル ─────────────────────────────────
+  - kind: sample
+    title: "AR(1): 自己回帰モデル"
+    markdown: |
+      ## 自己回帰モデル AR(p)
+
+      過去 $p$ 個の自分自身で現在を説明するモデル。最も単純な AR(1) は:
+
+      $$ y_t = c + \phi\, y_{t-1} + \varepsilon_t,\quad \varepsilon_t \sim \mathcal{N}(0,\sigma^2) $$
+
+      - $\phi$ (ファイ) は **過去の値をどれだけ引きずるか** を決める係数
+      - **$|\phi| < 1$** で定常 (平均回帰する)
+      - **$\phi = 1$** はランダムウォーク (非定常、単位根)
+      - **$\phi = 0$** はホワイトノイズ (過去と無相関)
+      - **$\phi$ が 1 に近い** ほど過去の値を強く引きずる
       - $\varepsilon_t$ はホワイトノイズ (平均 0 の独立な誤差項)
 
-      statsmodels で簡単に推定できます。
+      ### 一般化: AR(p)
+
+      $$ y_t = c + \phi_1 y_{t-1} + \phi_2 y_{t-2} + \dots + \phi_p y_{t-p} + \varepsilon_t $$
+
+      過去 $p$ 期分の自分を線形結合して説明する。statsmodels の `ARIMA(order=(p, 0, 0))` で推定できます。
     sample_code: |
       import numpy as np
       from statsmodels.tsa.arima_process import arma_generate_sample
       np.random.seed(42)
+      # statsmodels の AR 多項式は [1, -φ1, -φ2, ...] の符号反転形式
       ar_params = np.array([1, -0.7])    # φ = 0.7
-      ma_params = np.array([1])
+      ma_params = np.array([1])          # MA なし
       y = arma_generate_sample(ar_params, ma_params, nsample=100)
       print("生成されたパス [先頭 5]:", y[:5].round(3))
-      print("平均:", round(y.mean(), 4))
+      print("平均             :", round(y.mean(), 4))
+      print("標準偏差          :", round(y.std(), 4))
     runnable: true
     stickman: explain
-    stickman_speech: "AR(1) は時系列の入門に最適。"
+    stickman_speech: "AR(1) は最重要の入門モデル。φ の符号反転だけ気をつけよう！"
 
+  # ─── 2. MA / ARMA モデル ────────────────────────────
   - kind: sample
-    title: "ACF で自己相関を見る"
+    title: "MA / ARMA モデル"
     markdown: |
-      自己相関関数 (ACF) は「時刻 t の値と t-k の値の相関」を、
-      ラグ k ごとに計算したもの。AR(1) なら指数的に減衰します。
+      ## 移動平均モデル MA(q)
+
+      AR が「過去の自分」で説明するのに対し、MA は **「過去の誤差項」** で説明します:
+
+      $$ y_t = \mu + \varepsilon_t + \theta_1 \varepsilon_{t-1} + \dots + \theta_q \varepsilon_{t-q} $$
+
+      MA(q) は常に定常 (有限和なので分散が爆発しない)。一時的なショックの **減衰** を表すのに向きます。
+
+      ## ARMA(p, q)
+
+      AR と MA を組み合わせると **ARMA(p, q)**:
+
+      $$ y_t = c + \sum_{i=1}^{p}\phi_i\, y_{t-i} + \sum_{j=1}^{q}\theta_j\, \varepsilon_{t-j} + \varepsilon_t $$
+
+      **「過去の自分」+「過去のショックの引きずり」** で柔軟に表現でき、実データの当てはめでは ARMA(1,1) や ARMA(2,1) がよく登場します。
+
+      ## ACF と PACF — 次数の決め方
+
+      モデルの $p$ と $q$ を決める標準的な道具:
+
+      | 指標 | 意味 | 何で使う？ |
+      |---|---|---|
+      | **ACF**  (自己相関関数) | $\rho(k) = \mathrm{Corr}(y_t, y_{t-k})$ | **MA(q)** の次数特定（ラグ $q$ で打ち切れる） |
+      | **PACF** (偏自己相関関数) | ラグ $1,\dots,k-1$ の効果を取り除いた $y_t$ と $y_{t-k}$ の相関 | **AR(p)** の次数特定（ラグ $p$ で打ち切れる） |
+
+      経験則:
+      - **AR(p)**:  ACF は緩やかに減衰、PACF はラグ $p$ で **ばっさり 0** に
+      - **MA(q)**:  ACF はラグ $q$ で **ばっさり 0**、PACF は緩やかに減衰
+      - **ARMA**:   両方とも緩やかに減衰
     sample_code: |
       import numpy as np
-      from statsmodels.tsa.stattools import acf
+      from statsmodels.tsa.stattools import acf, pacf
       np.random.seed(0)
-      y = np.random.normal(0, 1, 200)
-      # AR(1) っぽく作る
-      for i in range(1, len(y)):
-          y[i] = 0.7 * y[i-1] + np.random.normal()
-      lags = acf(y, nlags=5)
-      print(lags.round(3))
+
+      # AR(1) φ=0.7 の系列を生成
+      y = np.zeros(300)
+      for t in range(1, 300):
+          y[t] = 0.7 * y[t-1] + np.random.normal()
+
+      ac = acf(y, nlags=8)
+      pa = pacf(y, nlags=8)
+      print("lag | ACF    | PACF")
+      print("----+--------+------")
+      for k, (a, p) in enumerate(zip(ac, pa)):
+          print(f" {k:2d} | {a:+.3f} | {p:+.3f}")
+      # AR(1) なので PACF はラグ 1 だけ大きく、ラグ 2 以降はほぼ 0 になる
     runnable: true
     stickman: explain
-    stickman_speech: "ラグ 0 が 1.0、それ以降が小さくなっていけば良いモデル。"
+    stickman_speech: "ACF は MA、PACF は AR — この対応を覚えれば次数決めの 80% は片付くよ！"
 
+  # ─── 3. 差分・ARIMA / 単位根検定 ─────────────────────
+  - kind: sample
+    title: "ARIMA(p, d, q) と差分"
+    markdown: |
+      ## 非定常 → 差分 → 定常
+
+      **株価・売上高・物価指数** など実データの多くは非定常 (トレンドあり / 分散が成長する)。
+      そのままでは ARMA を当てはめられないので、**差分 (differencing)** を取って定常化します:
+
+      $$ \Delta y_t = y_t - y_{t-1} $$
+
+      これでまだ非定常なら 2 階差を取ります ($\Delta^2 y_t = \Delta y_t - \Delta y_{t-1}$)。
+
+      **ARIMA(p, d, q)** はこの差分を組み込んだモデルで、各次数の意味は:
+
+      | 次数 | 何を表すか | 実務でよく使う値 |
+      |---|---|---|
+      | **p** | AR の次数 — 過去の値で説明 | 0 - 3 |
+      | **d** | **差分の階数** — 単位根を消す | **1** が圧倒的、株価は d=1 で対数差分 (= 対数リターン) と同等 |
+      | **q** | MA の次数 — 過去の誤差で説明 | 0 - 3 |
+
+      ## ADF 検定 — 単位根の有無を統計的に判定
+
+      Augmented Dickey-Fuller 検定の仮説:
+
+      $$ H_0: \text{単位根あり (非定常)},\quad H_1: \text{定常} $$
+
+      **判断**:
+      - p 値 < 0.05 → 帰無棄却 → **定常** → 差分不要 (`d=0`)
+      - p 値 ≥ 0.05 → 棄却できない → **非定常** → 1 階差を取って再検定 (`d=1`)
+
+      **金融データの典型**:
+      - **株価そのもの** はほぼ常に非定常 (`d=1` が必要)
+      - **株価リターン** (差分済) はほぼ常に定常 (`d=0` で OK)
+      - **金利・CPI** などマクロは判断が分かれる → ADF 必須
+    sample_code: |
+      import warnings
+      warnings.filterwarnings("ignore")
+      import pandas as pd
+      from statsmodels.tsa.stattools import adfuller
+
+      df = pd.read_csv("data/macro_indicators.csv", parse_dates=["date"]).set_index("date")
+      cpi = df["CPI_yoy"]
+
+      def report(series, name: str) -> None:
+          stat, p, *_ = adfuller(series.dropna())
+          verdict = "定常 (棄却 ○)" if p < 0.05 else "非定常 (棄却 ×)"
+          print(f"{name:20s}: ADF stat={stat:7.3f}  p={p:.4f}  {verdict}")
+
+      report(cpi,         "CPI level")
+      report(cpi.diff(),  "CPI 1st diff")
+      # 比較: 株価 (大抵 d=1 が必要)
+      px = pd.read_csv("data/stocks_daily.csv", parse_dates=["date"]).set_index("date")["AAPL_jp"]
+      report(px,              "Stock price level")
+      report(px.pct_change(), "Stock returns")
+    runnable: true
+    expected_output: "ADF stat"
+    stickman: explain
+    stickman_speech: "差分を取るかは「迷ったら ADF」。これを習慣化すると時系列の取り扱いが安定する。"
+
+  # ─── 4. 残差の白色化 (モデル診断) ────────────────────
+  - kind: sample
+    title: "残差の白色化 — Ljung-Box 検定"
+    markdown: |
+      ## 良いモデルとは「残差にもう説明できる構造がない」モデル
+
+      モデル $\hat{y}_t$ をフィットした後の **残差** $\hat{\varepsilon}_t = y_t - \hat{y}_t$ がホワイトノイズに近ければ、
+      時系列に含まれる構造はすべてモデルが拾えたと考えられます。これを **残差の白色化** と呼びます。
+
+      ### Ljung-Box 検定
+
+      残差にラグ $k$ までの自己相関がまとめてあるかを統計的に判定:
+
+      $$ H_0: \rho_1 = \rho_2 = \dots = \rho_h = 0\ (\text{残差は白色}) $$
+
+      - p 値 ≥ 0.05 → 帰無採択 → **残差は白色** → モデル OK
+      - p 値 < 0.05 → 帰無棄却 → **残差に自己相関が残っている** → モデル改善の余地あり (p, q を上げる等)
+
+      ### 情報量規準 (AIC / BIC)
+
+      モデルの次数 $(p, q)$ を比較するときは **AIC / BIC** を使うのが標準:
+      - AIC = $-2 \ln L + 2k$  (フィット良さと複雑度の妥協、予測重視)
+      - BIC = $-2 \ln L + k \ln n$ (AIC より罰則きつめ、簡素なモデルを選びやすい)
+
+      実務では候補モデル数個を比べて **AIC / BIC が小さい順 + 残差白色** を満たすものを採用します。
+    sample_code: |
+      import warnings
+      warnings.filterwarnings("ignore")
+      import numpy as np
+      from statsmodels.tsa.arima.model import ARIMA
+      from statsmodels.stats.diagnostic import acorr_ljungbox
+      np.random.seed(0)
+
+      # AR(1) の系列を生成して 3 通りのモデルでフィット比較
+      y = np.zeros(300)
+      for t in range(1, 300):
+          y[t] = 0.7 * y[t-1] + np.random.normal()
+
+      candidates = [(1, 0, 0), (2, 0, 0), (1, 0, 1)]
+      print("order      AIC      BIC     LjungBox(p)")
+      for order in candidates:
+          res = ARIMA(y, order=order).fit()
+          lb = acorr_ljungbox(res.resid, lags=[10], return_df=True)["lb_pvalue"].iloc[0]
+          print(f"{str(order):10s} {res.aic:7.2f}  {res.bic:7.2f}   {lb:.3f}")
+      # AIC / BIC 最小かつ Ljung-Box p>0.05 のモデルが良いモデル
+    runnable: true
+    stickman: explain
+    stickman_speech: "AIC で素早く絞り、Ljung-Box で残差が白いかを確認、この 2 段ロケットが定石。"
+
+  # ─── 演習 1: AR(1) 系列生成 ──────────────────────────
   - kind: exercise
     title: "AR(1) 系列を生成しよう"
     prompt: |
@@ -87,10 +307,12 @@ pages:
       wrong_hint2: "`-0.5`"
       wrong_hint3: "`-0.5`"
 
+  # ─── 演習 2: ACF 計算 ──────────────────────────────
   - kind: exercise
     title: "ACF を計算しよう"
     prompt: |
       生成した系列 `y` の自己相関を **ラグ 5** まで計算してください。
+      返り値は **ラグ 0 から 5 までの 6 個** の値です（ラグ 0 は必ず 1.0）。
     code_template: |
       import numpy as np
       from statsmodels.tsa.stattools import {{slot:fn}}
@@ -121,11 +343,17 @@ pages:
       wrong_hint2: "`acf` と `5`。"
       wrong_hint3: "`acf` と `5`。"
 
+  # ─── 演習 3: ARIMA 推定 ───────────────────────────
   - kind: exercise
     title: "ARIMA でモデル推定しよう"
     prompt: |
       AR(1) の系列 `y` から `ARIMA(1, 0, 0)` を推定してください。
-      `order=(p, d, q)` の `p=1, d=0, q=0` が AR(1) を意味します。
+      `order=(p, d, q)` の意味:
+      - **p = 1**: AR の次数（過去 1 期）
+      - **d = 0**: 差分なし（系列が既に定常と仮定）
+      - **q = 0**: MA なし
+
+      この組合せが **AR(1)** を表します。
     code_template: |
       import numpy as np
       from statsmodels.tsa.arima.model import ARIMA
@@ -158,30 +386,24 @@ pages:
       wrong_hint2: "`1`, `0`, `0`。"
       wrong_hint3: "`1`, `0`, `0`。"
 
-  # ─── 参考実装 ①: CPI に ARIMA(1,1,1) ─────────────────
+  # ─── 参考実装: マクロデータに ARIMA ──────────────────
   - kind: sample
-    title: "参考実装 — マクロデータに ARIMA を当てる"
+    title: "参考実装 — マクロデータに ARIMA(1,1,1) を当てる"
     markdown: |
-      ## ARIMA(p, d, q) の各次数の意味
+      ## 実データの一連の流れ
 
-      | 次数 | 何を表すか | よく使う値 |
-      |---|---|---|
-      | **p** | AR (Auto-Regressive) の次数 — 過去の値で説明 | 1-3 |
-      | **d** | 差分の階数 — 単位根を消す | **1** が圧倒的 (1 階差で定常化が多い) |
-      | **q** | MA (Moving Average) の次数 — 過去の誤差で説明 | 1-3 |
+      実務での時系列モデリングは次の 4 ステップで進めます:
 
-      **業界の作法**:
-      1. **ADF 検定** で単位根を見る → 1 階差で定常化するか確認 (d=1 が多い)
-      2. ACF / PACF プロットで p / q の候補を絞る
-      3. AIC / BIC が最小の組み合わせを選ぶ (Grid Search)
-      4. 残差が白色雑音か Ljung-Box 検定で確認
+      1. **可視化** で系列の挙動を眺める（トレンド・季節性・分散の変化）
+      2. **ADF 検定** で単位根を見る → 必要な差分階数 $d$ を決定
+      3. **ACF / PACF** で AR/MA の次数候補を絞る → grid で AIC/BIC 比較
+      4. **残差診断**（Ljung-Box）でモデルの妥当性を確認 → 予測
 
-      この Sample は CPI 年率変化に ARIMA(1,1,1) を当て、フィット結果と次 6 か月予測を出します。
+      この Sample は CPI 年率変化に ARIMA(1, 1, 1) を当て、フィット結果と次 6 か月の予測を出します。
     sample_code: |
       import warnings
       warnings.filterwarnings("ignore")
       import pandas as pd
-      import numpy as np
       from statsmodels.tsa.arima.model import ARIMA
 
       df = pd.read_csv("data/macro_indicators.csv", parse_dates=["date"]).set_index("date")
@@ -197,48 +419,3 @@ pages:
     runnable: true
     stickman: explain
     stickman_speech: "ARIMA は時系列の入門にして実務頻出。差分階数 d をどう取るかがすべての始まり。"
-
-  # ─── 参考実装 ②: ADF 検定で単位根を確認 ─────────────────
-  - kind: sample
-    title: "参考実装 — ADF 検定で定常性を判定"
-    markdown: |
-      ## 「差分を取るべきか」を統計的に判断する
-
-      ARIMA の `d` (差分階数) を決める前に、**Augmented Dickey-Fuller (ADF) 検定**で
-      系列が単位根を持つか（=非定常か）を確認します。
-
-      $$ H_0: \text{単位根あり (非定常)},\quad H_1: \text{定常} $$
-
-      **判断**:
-      - p 値 < 0.05 → 帰無棄却 → **定常** → 差分不要 (`d=0`)
-      - p 値 ≥ 0.05 → 棄却できない → **非定常** → 1 階差を取って再検定 (`d=1`)
-      - それでもダメなら 2 階差 (`d=2`) — まれ
-
-      **業界での注意**:
-      - **株価そのもの** はほぼ常に非定常 (d=1 が必要)
-      - **株価リターン** はほぼ常に定常 (d=0 で OK)
-      - 金利・CPI などマクロは判断が分かれる → ADF 必須
-    sample_code: |
-      import warnings
-      warnings.filterwarnings("ignore")
-      import pandas as pd
-      from statsmodels.tsa.stattools import adfuller
-
-      df = pd.read_csv("data/macro_indicators.csv", parse_dates=["date"]).set_index("date")
-      cpi = df["CPI_yoy"]
-
-      def report(series, name: str) -> None:
-          stat, p, *_ = adfuller(series.dropna())
-          verdict = "定常 (棄却 ○)" if p < 0.05 else "非定常 (棄却 ×)"
-          print(f"{name:20s}: ADF stat={stat:7.3f}  p={p:.4f}  {verdict}")
-
-      report(cpi, "CPI level")
-      report(cpi.diff(), "CPI 1st diff")
-      # 比較: 株価 (大抵 d=1 が必要)
-      px = pd.read_csv("data/stocks_daily.csv", parse_dates=["date"]).set_index("date")["AAPL_jp"]
-      report(px, "Stock price level")
-      report(px.pct_change(), "Stock returns")
-    runnable: true
-    expected_output: "ADF stat"
-    stickman: explain
-    stickman_speech: "差分を取るかは「迷ったら ADF」。これを習慣化すると時系列の取り扱いが安定する。"

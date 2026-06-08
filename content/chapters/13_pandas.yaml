@@ -218,7 +218,7 @@ pages:
             .std()
             * (252 ** 0.5)
       )
-      print("\n年率ボラ:")
+      print("\n年率ボラティリティ:")
       print(annual_vol.round(3))
     runnable: true
     stickman: explain

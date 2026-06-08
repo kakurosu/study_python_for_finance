@@ -154,7 +154,7 @@ pages:
       | `QE` | 四半期末 |
       | `YE` | 年末 |
 
-      集計関数: `.last()` (期末値)、`.mean()` (平均)、`.sum()` (合計)、`.std()` (ボラ) など。
+      集計関数: `.last()` (期末値)、`.mean()` (平均)、`.sum()` (合計)、`.std()` (標準偏差) など。
 
       **金融での定石**: 価格は `.last()` で月末値を取り、それから `.pct_change()` で月次リターン。
       逆順 (日次リターン → 月次集計) は積み立てが必要なので避ける。
@@ -167,34 +167,35 @@ pages:
       print("--- 月次リターン (最初の 6 か月) ---")
       print(monthly.head(6).round(4))
 
-      print("\n--- 月次ボラの年率換算 ---")
+      print("\n--- 月次標準偏差の年率換算（= 年率ボラティリティ） ---")
       vol_ann = monthly.std() * (12 ** 0.5)
       print(vol_ann.round(3))
     runnable: true
     stickman: explain
     stickman_speech: "粒度変換は resample 1 行。価格は last、リターンは sum/mean、と覚えよう。"
 
-  # ─── 参考実装 ②: rolling で移動平均ボラ ─────────────────
+  # ─── 参考実装 ②: rolling で移動平均ボラティリティ ─────────────────
   - kind: sample
-    title: "参考実装 — rolling で 20 日移動平均ボラ"
+    title: "参考実装 — rolling で 20 日移動ボラティリティ"
     markdown: |
       ## 「最近のリスク」を時系列で見る
 
       静的な共分散は便利だが、市場は時間とともにレジームが変わるので
-      **直近 N 日だけで計算した移動ボラ** を時系列で見るのが現場の定石。
+      **直近 N 日だけで計算した移動ボラティリティ**（rolling standard deviation を年率化したもの）
+      を時系列で見るのが現場の定石。
 
       ```python
-      ret.rolling(20).std() * sqrt(252)   # 20 日窓・年率
+      ret.rolling(20).std() * sqrt(252)   # 20 日窓・年率化（年率ボラティリティ）
       ```
 
       `window` は **観測数 (営業日数)** で指定:
       - 5 = 1 週間 (短期、ノイズ大)
       - 20 = 1 か月 (一般的)
       - 60 = 3 か月 (中期)
-      - 252 = 1 年 (年率ボラの一般的窓)
+      - 252 = 1 年 (年率ボラティリティの一般的窓)
 
-      **業界小ネタ**: VIX (S&P500 ボラ指数) は実装は違うが、概念は「短期予測ボラ」。
-      移動ボラはその簡易版として日々のリスクモニタに使われる。
+      **業界小ネタ**: VIX (S&P500 のインプライドボラティリティ指数) は実装は違うが、概念は「短期予測ボラティリティ」。
+      移動ボラティリティはその簡易版として日々のリスクモニタに使われる。
     sample_code: |
       import pandas as pd
       import matplotlib.pyplot as plt
@@ -211,7 +212,7 @@ pages:
       fig.tight_layout()
       plt.show()
 
-      print("最新 5 営業日の 20 日ボラ:")
+      print("最新 5 営業日の 20 日ボラティリティ:")
       print(vol_20.tail().round(3))
     runnable: true
     stickman: explain

@@ -187,7 +187,7 @@ pages:
 
       **業界ルール**:
       - 「銀行が扱う金額」「証券の単元未満端数」は **必ず Decimal**
-      - リターン・ボラ・SR は float で OK
+      - リターン・ボラティリティ・SR は float で OK
       - 通貨間レートは context によって Decimal / float を使い分け
     sample_code: |
       from decimal import Decimal, getcontext
