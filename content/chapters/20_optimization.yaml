@@ -17,9 +17,21 @@ pages:
 
       $$ \mathrm{Var}(p) = w_1^2 \sigma_1^2 + w_2^2 \sigma_2^2 + 2 w_1 w_2 \rho \sigma_1 \sigma_2 $$
 
+      ここで:
+      - $w_1, w_2$ : 各銘柄への投資比率（重み、$w_1 + w_2 = 1$）
+      - $\sigma_1, \sigma_2$ : 各銘柄リターンの標準偏差
+      - $\rho = \rho_{12}$ : 2 銘柄リターン間の相関係数（$-1 \le \rho \le 1$）
+      - $\mathrm{Var}(p)$ : ポートフォリオリターンの分散
+
       行列形式で書くと $n$ 銘柄に一般化できます:
 
-      $$ \mathrm{Var}(p) = \mathbf{w}^\top \Sigma\, \mathbf{w} \quad (\Sigma\ \text{は共分散行列}) $$
+      $$ \mathrm{Var}(p) = \mathbf{w}^\top \Sigma\, \mathbf{w} $$
+
+      ここで:
+      - $\mathbf{w}$ : $n \times 1$ の重みベクトル ($\sum_i w_i = 1$)
+      - $\mathbf{w}^\top$ : $\mathbf{w}$ の転置
+      - $\Sigma$ : $n \times n$ の **共分散行列** (対称行列、$(i,j)$ 要素は $\mathrm{Cov}(r_i, r_j)$)
+      - 結果はスカラー（ポートフォリオ分散）
 
       第 3 項の $2 w_1 w_2 \rho \sigma_1 \sigma_2$ がポートフォリオ理論の **「分散効果」** の源泉 — $\rho < 1$ ならリスクが減ります。
     sample_code: |

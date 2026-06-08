@@ -23,6 +23,13 @@ pages:
 
       $$ \mu_{\text{annual}} = \mu_{\text{daily}} \times 252,\quad \sigma_{\text{annual}} = \sigma_{\text{daily}} \times \sqrt{252} $$
 
+      ここで:
+      - $\mu_{\text{daily}}$ : 日次リターンの期待値（平均）
+      - $\mu_{\text{annual}}$ : 年率に換算した期待リターン
+      - $\sigma_{\text{daily}}$ : 日次リターンの標準偏差
+      - $\sigma_{\text{annual}}$ : 年率ボラティリティ
+      - $252$ : 米国の年間営業日数（東京は 245、為替は 260 等、市場で異なる）
+
       これは独立同分布を仮定したときの **「ルート T 則」** と呼ばれます (分散は線形加算、標準偏差は √)。
     sample_code: |
       import numpy as np
@@ -41,6 +48,11 @@ pages:
       日次→年率の換算ルール:
 
       $$ \mu_{\text{ann}} = \mu_{\text{daily}} \times 252,\quad \mathrm{Var}_{\text{ann}} = \mathrm{Var}_{\text{daily}} \times 252,\quad \sigma_{\text{ann}} = \sigma_{\text{daily}} \times \sqrt{252} $$
+
+      ここで:
+      - $\mu_{\text{daily}}, \mathrm{Var}_{\text{daily}}, \sigma_{\text{daily}}$ : 日次リターンの期待値・分散・標準偏差
+      - $\mu_{\text{ann}}, \mathrm{Var}_{\text{ann}}, \sigma_{\text{ann}}$ : 同じく年率換算後の値
+      - 期待値と分散は **線形** に拡大 ($\times 252$)、標準偏差は **平方根** で拡大 ($\times \sqrt{252}$)
 
       これは「**独立同分布（i.i.d.）の和の分散は分散の和になる**」という確率論の基本性質から来ています。金融実務での年率換算の前提です。
     code_template: |

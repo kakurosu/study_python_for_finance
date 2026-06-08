@@ -13,13 +13,21 @@ pages:
     markdown: |
       ## GBM (Geometric Brownian Motion)
 
-      株価の代表的なモデル:
+      株価の代表的なモデル (Geometric Brownian Motion, GBM):
 
       $$ S_T = S_0 \exp\!\Bigl( \bigl(\mu - \tfrac{\sigma^2}{2}\bigr) T + \sigma \sqrt{T}\, Z \Bigr),\quad Z \sim \mathcal{N}(0, 1) $$
 
-      - $\mu$: 期待リターン (年率)、$\sigma$: ボラティリティ (= リターンの年率標準偏差)
-      - **ドリフト補正項 $-\sigma^2/2$** は伊藤の補題から来る (これを忘れると価格期待値がズレる)
-      - たくさんの $Z$ をサンプリング → $S_T$ の分布 → ペイオフを平均 → 割引でオプション価格
+      ここで:
+      - $S_0$ : 現在 (時刻 0) の株価 (initial price)
+      - $S_T$ : 時刻 $T$ における株価（確率変数）
+      - $\mu$ : 期待リターン (年率、drift)
+      - $\sigma$ : ボラティリティ (= リターンの年率標準偏差)
+      - $T$ : 時間（年単位、例: 1 年なら $T=1$、6 か月なら $T=0.5$）
+      - $Z$ : 標準正規分布 $\mathcal{N}(0, 1)$ に従う確率変数（ランダム性の源）
+      - $\sigma \sqrt{T}\, Z$ : ブラウン運動の累積拡散項
+      - **ドリフト補正項 $-\sigma^2/2$** : 伊藤の補題から来る項（これを忘れると価格期待値がズレる）
+
+      たくさんの $Z$ をサンプリング → $S_T$ の分布 → ペイオフを平均 → 割引でオプション価格
     sample_code: |
       import numpy as np
       np.random.seed(42)
